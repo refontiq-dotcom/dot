@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const guestName = typeof body.guestName === 'string' ? body.guestName.trim().replace(/\\s+/g, ' ') : '';
+  const guestName = typeof body.guestName === 'string' ? body.guestName.trim().replace(/\s+/g, ' ') : '';
   if (guestName.length < 2 || guestName.length > 120) {
     return jsonError('Veuillez saisir votre nom et prénom (2 à 120 caractères).', 400);
   }
