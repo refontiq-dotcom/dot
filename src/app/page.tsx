@@ -158,7 +158,7 @@ export default function Home() {
               </div>
               <div className="actions">
                 <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
-                {content.pagne.enabled && <a className="button clay" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>
+                {content.pagne.enabled && <a className="button clay" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
                 <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
                 <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
               </div>
