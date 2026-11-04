@@ -31,6 +31,7 @@ export default function Home() {
   const [attending, setAttending] = useState('yes');
   const [personCount, setPersonCount] = useState('1');
   const [rsvpStatus, setRsvpStatus] = useState('');
+  const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [remaining, setRemaining] = useState<number>(() =>
     Math.max(0, eventDate.getTime() - Date.now()),
@@ -82,7 +83,7 @@ export default function Home() {
       const response = await fetch('/api/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0, website: '' }),
+        body: JSON.stringify({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0, website }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
@@ -90,6 +91,7 @@ export default function Home() {
       setGuestName('');
       setAttending('yes');
       setPersonCount('1');
+      setWebsite('');
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
     } finally {
@@ -270,7 +272,7 @@ export default function Home() {
               )}
               <div className="rsvp-trap" aria-hidden="true">
                 <label htmlFor="rsvp-website">Ne pas remplir ce champ</label>
-                <input id="rsvp-website" tabIndex={-1} autoComplete="off" />
+                <input id="rsvp-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
               </div>
               <button className="button" type="submit" disabled={rsvpBusy}>{rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}</button>
               {rsvpStatus && <p className="rsvp-status" role="status" aria-live="polite">{rsvpStatus}</p>}
