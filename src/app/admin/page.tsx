@@ -46,7 +46,7 @@ export default function AdminPage() {
   const shown=useMemo(()=>guests.filter(g=>g.guest_name.toLowerCase().includes(search.trim().toLowerCase())&&(filter==='all'||(filter==='yes'&&g.confirmed)||(filter==='no'&&!g.confirmed))),[guests,search,filter]);
   const yes=guests.filter(g=>g.confirmed).length,no=guests.length-yes,total=guests.reduce((s,g)=>s+(g.confirmed?g.person_count:0),0);
   function exportCsv(){const rows=[['Nom','Réponse','Nombre de personnes','Date'],...shown.map(g=>[g.guest_name,g.confirmed?'Présent(e)':'Absent(e)',String(g.person_count),new Date(g.created_at).toLocaleString('fr-FR')])];
-    const csv='\uFEFF'+rows.map(row=>row.map(x=>'"'+x.replace(/"/g,'""')+'"').join(';')).join('\r\n');
+    const csv='\uFEFF'+rows.map(row=>row.map(x=>{const safe=/^[=+\\-@]/.test(x)?`'${x}`:x;return '"'+safe.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download='liste-invites-dot.csv';a.click();URL.revokeObjectURL(url);
   }
   if(!ready)return <main className="admin-wrap"><div className="shell">Vérification de la session…</div></main>;
