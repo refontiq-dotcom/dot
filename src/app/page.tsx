@@ -36,6 +36,14 @@ export default function Home() {
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [showTravelGuide, setShowTravelGuide] = useState(false);
+
+  useEffect(() => {
+    try {
+      setShowTravelGuide(window.sessionStorage.getItem('dot-travel-guide-unlocked') === 'yes');
+    } catch {
+      setShowTravelGuide(false);
+    }
+  }, []);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
   const formattedEventTime = content.eventTime.replace(':', ' h ');
@@ -92,7 +100,17 @@ export default function Home() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
       setRsvpStatus('Merci ! Votre réponse a bien été enregistrée.');
-      setShowTravelGuide(attending === 'yes');
+      const travelGuideUnlocked = attending === 'yes';
+      setShowTravelGuide(travelGuideUnlocked);
+      try {
+        if (travelGuideUnlocked) {
+          window.sessionStorage.setItem('dot-travel-guide-unlocked', 'yes');
+        } else {
+          window.sessionStorage.removeItem('dot-travel-guide-unlocked');
+        }
+      } catch {
+        // Le guide reste accessible dans la session courante même si le stockage est indisponible.
+      }
       setGuestName('');
       setAttending('yes');
       setPersonCount('1');
