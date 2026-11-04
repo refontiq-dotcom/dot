@@ -86,10 +86,10 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
         ...value,
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
-        items: programResult.data?.length
+        items: Array.isArray(programResult.data)
           ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed }))
           : (value.items ?? initialContent.items),
-        faq: faqResult.data?.length
+        faq: Array.isArray(faqResult.data)
           ? faqResult.data.map(item => ({ id: item.id, title: item.question, detail: item.answer, confirmed: item.confirmed }))
           : (value.faq ?? initialContent.faq),
       };
