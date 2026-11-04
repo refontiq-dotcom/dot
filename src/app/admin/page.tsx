@@ -1,13 +1,13 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, LogOut, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, LogOut, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus, Phone, MessageCircle } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
 type RSVP = { id: string; guest_name: string; person_count: number; confirmed: boolean; created_at: string };
-type Tab = 'overview' | 'event' | 'program' | 'announcement' | 'faq' | 'guests';
+type Tab = 'overview' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
   const [password,setPassword]=useState(''),[ready,setReady]=useState(false),[logged,setLogged]=useState(false);
@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [guests,setGuests]=useState<RSVP[]>([]),[tab,setTab]=useState<Tab>('overview'),[notice,setNotice]=useState('');
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
   const [filter,setFilter]=useState<'all'|'yes'|'no'>('all');
+  const [uploadingPagne,setUploadingPagne]=useState(false);
 
   const checkSession=useCallback(async()=>{
     try { const {data}=await getSupabase().auth.getSession(); const email=data.session?.user.email?.toLowerCase();
@@ -43,6 +44,30 @@ export default function AdminPage() {
   function addItem(list:'items'|'faq'){setContent(v=>({...v,[list]:[...v[list],{id:crypto.randomUUID(),title:'',detail:'',confirmed:false}]}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
   async function save(){setSaving(true);setNotice('');try{if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');await saveContent(content);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function uploadPagneImage(event:ChangeEvent<HTMLInputElement>){
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file)return;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){setNotice('Choisissez une image JPG, PNG ou WebP.');return;}
+    if(file.size>5*1024*1024){setNotice('L’image ne doit pas dépasser 5 Mo.');return;}
+    setUploadingPagne(true);setNotice('');
+    try{
+      const sb=getSupabase();
+      const {error}=await sb.storage.from('dot-pagne').upload('pagne/visuel',file,{upsert:true,contentType:file.type,cacheControl:'3600'});
+      if(error)throw error;
+      const {data}=sb.storage.from('dot-pagne').getPublicUrl('pagne/visuel');
+      const next={...content,pagne:{...content.pagne,imageUrl:`${data.publicUrl}?v=${Date.now()}`}};
+      await saveContent(next);
+      setContent(next);
+      setNotice('Photo du pagne mise à jour et publiée.');
+    }catch(e){setNotice(e instanceof Error?e.message:'Envoi de la photo impossible.');}
+    finally{setUploadingPagne(false);}
+  }
+  function addPagneContact(){field('pagne',{...content.pagne,contacts:[...content.pagne.contacts,{id:crypto.randomUUID(),label:'',phone:''}]});}
+  function editPagneContact(index:number,patch:Partial<Content['pagne']['contacts'][number]>){
+    field('pagne',{...content.pagne,contacts:content.pagne.contacts.map((item,i)=>i===index?{...item,...patch}:item)});
+  }
+  function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
   const shown=useMemo(()=>guests.filter(g=>g.guest_name.toLowerCase().includes(search.trim().toLowerCase())&&(filter==='all'||(filter==='yes'&&g.confirmed)||(filter==='no'&&!g.confirmed))),[guests,search,filter]);
   const yes=guests.filter(g=>g.confirmed).length,no=guests.length-yes,total=guests.reduce((s,g)=>s+(g.confirmed?g.person_count:0),0);
   function exportCsv(){const rows=[['Nom','Réponse','Nombre de personnes','Date'],...shown.map(g=>[g.guest_name,g.confirmed?'Présent(e)':'Absent(e)',String(g.person_count),new Date(g.created_at).toLocaleString('fr-FR')])];
@@ -62,6 +87,7 @@ export default function AdminPage() {
     {id:'overview',label:'Vue d’ensemble',icon:<Users/>},{id:'event',label:'Date et lieu',icon:<MapPin/>},
     {id:'program',label:'Programme',icon:<ListChecks/>},{id:'announcement',label:'Annonces',icon:<Megaphone/>},
     {id:'faq',label:'Questions fréquentes',icon:<CircleHelp/>},{id:'guests',label:'Invités et réponses',icon:<UserCheck/>},
+    {id:'pagne',label:'Pagne de la dot',icon:<ShoppingBag/>},
   ];
   return <main className="admin-wrap"><div className="shell">
     <header className="admin-dashboard-head"><div><div className="eyebrow">Deux héritages, une même union</div><h1>Administration</h1><p>Gestion de la cérémonie et suivi des invités</p></div>
@@ -101,6 +127,29 @@ export default function AdminPage() {
         {content.faq.map((item,i)=><div className="admin-edit-card" key={item.id}><div className="admin-edit-card-head"><b>Question {i+1}</b><button className="admin-icon-button danger" onClick={()=>removeItem('faq',i)} aria-label="Supprimer"><Trash2/></button></div>
           <label>Question</label><input value={item.title} onChange={e=>editItem('faq',i,{title:e.target.value})}/><label>Réponse</label><textarea value={item.detail} onChange={e=>editItem('faq',i,{detail:e.target.value})}/><label className="admin-checkbox"><input type="checkbox" checked={item.confirmed} onChange={e=>editItem('faq',i,{confirmed:e.target.checked})}/> Réponse confirmée</label></div>)}
         <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer la FAQ'}</button></div>}
+
+      {tab==='pagne'&&<div className="admin-panel"><h3>Le pagne de la dot</h3>
+        <p className="admin-muted">Une présentation simple : photo, prix et contacts directs des vendeurs.</p>
+        <label className="admin-checkbox"><input type="checkbox" checked={content.pagne.enabled} onChange={e=>field('pagne',{...content.pagne,enabled:e.target.checked})}/> Afficher le pagne sur l’invitation</label>
+        <div className="admin-form-grid">
+          <div><label>Prix (FCFA)</label><input type="number" min="0" step="50" value={content.pagne.price} onChange={e=>field('pagne',{...content.pagne,price:Number(e.target.value)})}/></div>
+          <div className="admin-full"><label>Description courte</label><textarea value={content.pagne.description} onChange={e=>field('pagne',{...content.pagne,description:e.target.value})}/></div>
+        </div>
+        <div className="admin-edit-card">
+          <div className="admin-edit-card-head"><b>Photo du pagne</b><ImagePlus size={20}/></div>
+          {content.pagne.imageUrl&&<img className="admin-pagne-preview" src={content.pagne.imageUrl} alt="Aperçu du pagne"/>}
+          <label htmlFor="pagne-image">Choisir ou remplacer la photo</label>
+          <input id="pagne-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPagneImage} disabled={uploadingPagne}/>
+          <p className="admin-muted">{uploadingPagne?'Téléversement en cours…':'JPG, PNG ou WebP · 5 Mo maximum. La photo est publiée dès son envoi.'}</p>
+        </div>
+        <div className="admin-inline-head"><div><h3>Contacts des vendeurs</h3><p className="admin-muted">Chaque numéro affiche les boutons Appeler et WhatsApp.</p></div><button className="button secondary small" onClick={addPagneContact}><Plus size={16}/> Ajouter un vendeur</button></div>
+        {content.pagne.contacts.map((contact,i)=><div className="admin-edit-card" key={contact.id}>
+          <div className="admin-edit-card-head"><b>Vendeur {i+1}</b><button className="admin-icon-button danger" onClick={()=>removePagneContact(i)} aria-label="Supprimer ce vendeur"><Trash2/></button></div>
+          <label>Nom ou repère du vendeur</label><input value={contact.label} onChange={e=>editPagneContact(i,{label:e.target.value})} placeholder="Ex. : Vendeur 1"/>
+          <label>Numéro de téléphone (avec indicatif pays pour WhatsApp)</label><input type="tel" value={contact.phone} onChange={e=>editPagneContact(i,{phone:e.target.value})} placeholder="Ex. : +225 07 00 00 00 00"/>
+        </div>)}
+        <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer le pagne et les contacts'}</button>
+      </div>}
 
       {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Réponses des invités</h3><p className="admin-muted">Liste privée accessible uniquement aux organisateurs.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Exporter CSV / Excel</button></div>
         <div className="admin-guest-tools"><div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un nom…"/></div><select value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}><option value="all">Toutes les réponses</option><option value="yes">Présences confirmées</option><option value="no">Absences</option></select></div>
