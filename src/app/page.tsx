@@ -35,6 +35,7 @@ export default function Home() {
   const [rsvpStatus, setRsvpStatus] = useState('');
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [showTravelGuide, setShowTravelGuide] = useState(false);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
   const formattedEventTime = content.eventTime.replace(':', ' h ');
@@ -91,6 +92,7 @@ export default function Home() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
       setRsvpStatus('Merci ! Votre réponse a bien été enregistrée.');
+      setShowTravelGuide(attending === 'yes');
       setGuestName('');
       setAttending('yes');
       setPersonCount('1');
@@ -276,27 +278,43 @@ export default function Home() {
               <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
               <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
               <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-              <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button secondary" style={{ marginTop: 16 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
-              <div className="card" style={{ marginTop: 24 }}>
-                <div className="eyebrow">Venir en transport en commun</div>
-                <h3>En bus SOTRA</h3>
-                <p>Descendez au niveau du commissariat du 22e arrondissement, puis suivez l’itinéraire indiqué vers Laser Park et le lieu de réception. Selon la ligne, demandez au receveur de vous confirmer l’arrêt le plus proche.</p>
-                <ul>
-                  <li><strong>81 :</strong> Gare Nord (Adjamé) → Angré.</li>
-                  <li><strong>82 :</strong> Gare Sud (Plateau) → Angré.</li>
-                  <li><strong>90 :</strong> Cocody Blockauss → Angré.</li>
-                  <li><strong>719 :</strong> Yopougon Saint-André → Terminus Angré 81-82.</li>
-                  <li><strong>775 :</strong> Angré Château ↔ CHU de Treichville.</li>
-                  <li><strong>704 :</strong> Angré / Abobo Baoulé ↔ Saint-Jean.</li>
-                </ul>
-                <p className="latest">À noter : les lignes 704 et 775 desservent des arrêts du secteur, notamment Pharmacie Angré / Petro Ivoire. Vérifiez auprès du chauffeur l’arrêt adapté au commissariat du 22e. La ligne 732 n’est pas encore confirmée.</p>
-              </div>
-              <div className="card" style={{ marginTop: 16 }}>
-                <div className="eyebrow">Venir en taxi ou en voiture</div>
-                <h3>Taxi compteur, Yango ou véhicule personnel</h3>
-                <p><strong>En taxi ou avec Yango :</strong> indiquez « Laser Park, Cocody Angré Mahou » comme destination. Une fois arrivé, suivez le court itinéraire à pied jusqu’au lieu de réception.</p>
-                <p><strong>Avec votre propre voiture :</strong> ouvrez l’itinéraire Google Maps ci-dessus et suivez le trajet jusqu’au lieu de réception.</p>
-              </div>
+              {showTravelGuide ? (
+                <div className="travel-guide" aria-live="polite">
+                  <div className="card" style={{ marginTop: 24 }}>
+                    <div className="eyebrow">Votre accès à la réception</div>
+                    <h3>Merci d’avoir confirmé votre présence !</h3>
+                    <p>Voici les indications pour rejoindre facilement le lieu de la cérémonie.</p>
+                    <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button" style={{ marginTop: 12 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
+                  </div>
+                  <div className="card" style={{ marginTop: 16 }}>
+                    <div className="eyebrow">En transport en commun</div>
+                    <h3>En bus SOTRA</h3>
+                    <p>Les lignes ci-dessous desservent l’arrêt du commissariat du 22e arrondissement. Descendez à cet arrêt, puis suivez l’itinéraire à pied vers Laser Park et le lieu de réception.</p>
+                    <ul>
+                      <li><strong>81 :</strong> au départ de la Gare Nord (Adjamé).</li>
+                      <li><strong>82 :</strong> au départ de la Gare Sud (Plateau).</li>
+                      <li><strong>90 :</strong> au départ de Cocody Blockauss.</li>
+                      <li><strong>719 :</strong> au départ de Yopougon Saint-André.</li>
+                      <li><strong>775 :</strong> ligne desservant le secteur d’Angré.</li>
+                      <li><strong>704 :</strong> ligne desservant le secteur d’Angré.</li>
+                    </ul>
+                    <p>À l’arrêt du commissariat du 22e, ouvrez l’itinéraire Google Maps pour terminer le trajet à pied.</p>
+                  </div>
+                  <div className="card" style={{ marginTop: 16 }}>
+                    <div className="eyebrow">En taxi ou en voiture</div>
+                    <h3>Taxi compteur, Yango ou véhicule personnel</h3>
+                    <p><strong>En taxi compteur ou avec Yango :</strong> indiquez « Laser Park, Cocody Angré Mahou » comme destination. À l’arrivée, suivez le court trajet à pied jusqu’au lieu de réception.</p>
+                    <p><strong>Avec votre propre voiture :</strong> ouvrez l’itinéraire Google Maps et suivez le trajet jusqu’au lieu de réception.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="card" style={{ marginTop: 24 }}>
+                  <div className="eyebrow">Accès aux indications détaillées</div>
+                  <h3>Vous venez célébrer avec nous ?</h3>
+                  <p>Confirmez votre présence dans le formulaire ci-dessous pour afficher les différents moyens de rejoindre le lieu de réception.</p>
+                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ma présence</a>
+                </div>
+              )}
             </div>
             <div className="mapbox">
               <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
