@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   CalendarDays,
   MapPin,
@@ -75,7 +75,7 @@ export default function Home() {
   const days = Math.ceil(remaining / DAY_IN_MS);
   const stamp = updated || 'Mise à jour non renseignée';
 
-  async function submitRsvp(event: React.FormEvent<HTMLFormElement>) {
+  async function submitRsvp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRsvpBusy(true);
     setRsvpStatus('');
@@ -128,7 +128,8 @@ export default function Home() {
             <a href="#details">La cérémonie</a>
             <a href="#programme">Programme</a>
             <a href="#lieu">Le lieu</a>
-            <a href="#rsvp">Présence</a>\n            <a href="#faq">Questions</a>
+            <a href="#rsvp">Présence</a>
+            <a href="#faq">Questions</a>
           </nav>
           <a className="button small" href="#annonces">Dernières nouvelles <Megaphone size={16} /></a>
         </div>
@@ -152,7 +153,8 @@ export default function Home() {
                 <div className="countbox"><span>2026</span><small>année</small></div>
               </div>
               <div className="actions">
-                <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>\n                <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
+                <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
+                <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
                 <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
               </div>
               {shareMsg && <p className="latest" role="status">{shareMsg}</p>}
