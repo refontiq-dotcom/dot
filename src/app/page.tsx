@@ -144,13 +144,13 @@ export default function Home() {
               <p className="lead">Avec joie, les familles {content.familyNames} vous invitent à célébrer la dot traditionnelle de</p>
               <h2 className="serif" style={{ fontSize: 'clamp(25px,4vw,34px)', marginBottom: 8 }}>
                 {content.groomName}<br />
-                <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>&amp;</span> Dukoua You Vanessa
+                <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>&amp;</span> {content.brideName}
               </h2>
               <div className="date-pill"><Calendar /><span>{formattedEventDate} · {formattedEventTime}</span></div>
               <div className="countdown" aria-label={`Dans ${days} jours`}>
                 <div className="countbox"><span>{days}</span><small>jours</small></div>
-                <div className="countbox"><span>12</span><small>déc.</small></div>
-                <div className="countbox"><span>2026</span><small>année</small></div>
+                <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>{new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' }).format(eventDate).replace('.', '')}</small></div>
+                <div className="countbox"><span>{eventDate.getUTCFullYear()}</span><small>année</small></div>
               </div>
               <div className="actions">
                 <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
@@ -163,7 +163,7 @@ export default function Home() {
               <div className="portrait-inner">
                 <small>Une union</small>
                 <span className="initials">A <span style={{ color: 'var(--clay)' }}>&amp;</span> D</span>
-                <small>12 · 12 · 2026</small>
+                <small>{content.eventDate.split('-').reverse().join(' · ')}</small>
               </div>
             </div>
           </div>
@@ -322,7 +322,7 @@ export default function Home() {
 
       <footer className="footer">
         <div className="shell" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <span>Avec affection, les familles Anougbre &amp; Dukoua · 2026</span>
+          <span>Avec affection, les familles {content.familyNames} · {eventDate.getUTCFullYear()}</span>
           <a href="/admin">Accès organisateurs</a>
         </div>
       </footer>
