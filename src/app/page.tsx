@@ -209,12 +209,13 @@ export default function Home() {
                   <p>Choisissez un vendeur et contactez-le directement pour passer votre commande.</p>
                   {content.pagne.contacts.length > 0 ? content.pagne.contacts.map((contact, index) => {
                     const digits = contact.phone.replace(/\D/g, '');
+                    const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
                     return <div className="pagne-seller" key={contact.id}>
                       <strong>{contact.label.trim() || `Vendeur ${index + 1}`}</strong>
                       <span>{contact.phone}</span>
                       {digits.length >= 8 && <div className="pagne-actions">
                         <a className="button" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={17}/> Appeler pour commander</a>
-                        <a className="button secondary" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Commander sur WhatsApp</a>
+                        <a className="button secondary" href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Commander sur WhatsApp</a>
                       </div>}
                     </div>;
                   }) : <p className="notice">Les contacts des vendeurs seront bientôt affichés ici.</p>}
