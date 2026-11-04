@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, LogOut, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
@@ -42,7 +42,7 @@ export default function AdminPage() {
   function editItem(list:'items'|'faq',i:number,patch:Partial<Item>){setContent(v=>({...v,[list]:v[list].map((x,n)=>n===i?{...x,...patch}:x)}));}
   function addItem(list:'items'|'faq'){setContent(v=>({...v,[list]:[...v[list],{id:crypto.randomUUID(),title:'',detail:'',confirmed:false}]}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
-  async function save(){setSaving(true);setNotice('');try{await saveContent(content);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function save(){setSaving(true);setNotice('');try{if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');await saveContent(content);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
   const shown=useMemo(()=>guests.filter(g=>g.guest_name.toLowerCase().includes(search.trim().toLowerCase())&&(filter==='all'||(filter==='yes'&&g.confirmed)||(filter==='no'&&!g.confirmed))),[guests,search,filter]);
   const yes=guests.filter(g=>g.confirmed).length,no=guests.length-yes,total=guests.reduce((s,g)=>s+(g.confirmed?g.person_count:0),0);
   function exportCsv(){const rows=[['Nom','Réponse','Nombre de personnes','Date'],...shown.map(g=>[g.guest_name,g.confirmed?'Présent(e)':'Absent(e)',String(g.person_count),new Date(g.created_at).toLocaleString('fr-FR')])];
@@ -58,7 +58,7 @@ export default function AdminPage() {
     <div className="admin-login-security"><ShieldCheck size={16}/> Accès protégé · réponses privées</div><Link href="/" className="admin-back-link"><ArrowLeft size={16}/> Retour à l’invitation</Link>
   </section></main>;
 
-  const tabs:{id:Tab;label:string;icon:React.ReactNode}[]=[
+  const tabs:{id:Tab;label:string;icon:ReactNode}[]=[
     {id:'overview',label:'Vue d’ensemble',icon:<Users/>},{id:'event',label:'Date et lieu',icon:<MapPin/>},
     {id:'program',label:'Programme',icon:<ListChecks/>},{id:'announcement',label:'Annonces',icon:<Megaphone/>},
     {id:'faq',label:'Questions fréquentes',icon:<CircleHelp/>},{id:'guests',label:'Invités et réponses',icon:<UserCheck/>},
