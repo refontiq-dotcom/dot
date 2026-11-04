@@ -311,10 +311,10 @@ export default function Home() {
                     <ul>
                       <li><strong>81 :</strong> au départ de la Gare Nord (Adjamé).</li>
                       <li><strong>82 :</strong> au départ de la Gare Sud (Plateau).</li>
-                      <li><strong>90 :</strong> au départ de Cocody Blockauss.</li>
+                      <li><strong>90 :</strong> au départ de Cocody Blockhaus.</li>
                       <li><strong>719 :</strong> au départ de Yopougon Saint-André.</li>
-                      <li><strong>775 :</strong> ligne desservant le secteur d’Angré.</li>
-                      <li><strong>704 :</strong> ligne desservant le secteur d’Angré.</li>
+                      <li><strong>775 :</strong> descendez à l’arrêt du commissariat du 22e arrondissement.</li>
+                      <li><strong>704 :</strong> descendez à l’arrêt du commissariat du 22e arrondissement.</li>
                     </ul>
                     <p>À l’arrêt du commissariat du 22e, ouvrez l’itinéraire Google Maps pour terminer le trajet à pied.</p>
                   </div>
