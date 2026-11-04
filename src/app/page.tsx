@@ -13,6 +13,9 @@ import {
   Share2,
   Navigation,
   Info,
+  ShoppingBag,
+  Phone,
+  MessageCircle,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 
@@ -126,6 +129,7 @@ export default function Home() {
           <a href="#accueil" className="brand">A <span style={{ color: 'var(--clay)' }}>×</span> D</a>
           <nav className="navlinks" aria-label="Navigation principale">
             <a href="#details">La cérémonie</a>
+            {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
             <a href="#programme">Programme</a>
             <a href="#lieu">Le lieu</a>
             <a href="#rsvp">Présence</a>
@@ -154,6 +158,7 @@ export default function Home() {
               </div>
               <div className="actions">
                 <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
+                {content.pagne.enabled && <a className="button clay" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>
                 <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
                 <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
               </div>
@@ -183,6 +188,41 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {content.pagne.enabled && (
+          <section className="section" id="pagne">
+            <div className="shell pagne-section">
+              <div className="section-head">
+                <div className="eyebrow">Commande directe auprès des vendeurs</div>
+                <h2>Le pagne de la dot</h2>
+                <p>{content.pagne.description}</p>
+              </div>
+              <div className="pagne-card">
+                <div className="pagne-visual">
+                  {content.pagne.imageUrl
+                    ? <img src={content.pagne.imageUrl} alt="Pagne proposé pour la dot" />
+                    : <div className="pagne-placeholder"><ShoppingBag size={42}/><span>Photo du pagne à venir</span></div>}
+                </div>
+                <div className="pagne-details">
+                  <div className="eyebrow">Prix du pagne</div>
+                  <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA</div>
+                  <p>Choisissez un vendeur et contactez-le directement pour passer votre commande.</p>
+                  {content.pagne.contacts.length > 0 ? content.pagne.contacts.map((contact, index) => {
+                    const digits = contact.phone.replace(/\D/g, '');
+                    return <div className="pagne-seller" key={contact.id}>
+                      <strong>{contact.label.trim() || `Vendeur ${index + 1}`}</strong>
+                      <span>{contact.phone}</span>
+                      {digits.length >= 8 && <div className="pagne-actions">
+                        <a className="button" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={17}/> Appeler pour commander</a>
+                        <a className="button secondary" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Commander sur WhatsApp</a>
+                      </div>}
+                    </div>;
+                  }) : <p className="notice">Les contacts des vendeurs seront bientôt affichés ici.</p>}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="section soft" id="annonces">
           <div className="shell">
