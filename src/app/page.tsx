@@ -27,6 +27,11 @@ export default function Home() {
   const [content, setContent] = useState<Content>(initialContent);
   const [updated, setUpdated] = useState<string>('');
   const [shareMsg, setShareMsg] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [attending, setAttending] = useState('yes');
+  const [personCount, setPersonCount] = useState('1');
+  const [rsvpStatus, setRsvpStatus] = useState('');
+  const [rsvpBusy, setRsvpBusy] = useState(false);
   const [remaining, setRemaining] = useState<number>(() =>
     Math.max(0, eventDate.getTime() - Date.now()),
   );
@@ -69,6 +74,29 @@ export default function Home() {
   const days = Math.ceil(remaining / DAY_IN_MS);
   const stamp = updated || 'Mise à jour non renseignée';
 
+  async function submitRsvp(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRsvpBusy(true);
+    setRsvpStatus('');
+    try {
+      const response = await fetch('/api/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0, website: '' }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
+      setRsvpStatus('Merci ! Votre réponse a bien été enregistrée.');
+      setGuestName('');
+      setAttending('yes');
+      setPersonCount('1');
+    } catch (error) {
+      setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
+    } finally {
+      setRsvpBusy(false);
+    }
+  }
+
   async function share() {
     const shareData = {
       title: 'La dot d’Anougbre Brou Frédéric & Dukoua You Vanessa',
@@ -98,7 +126,7 @@ export default function Home() {
             <a href="#details">La cérémonie</a>
             <a href="#programme">Programme</a>
             <a href="#lieu">Le lieu</a>
-            <a href="#faq">Questions</a>
+            <a href="#rsvp">Présence</a>\n            <a href="#faq">Questions</a>
           </nav>
           <a className="button small" href="#annonces">Dernières nouvelles <Megaphone size={16} /></a>
         </div>
@@ -122,7 +150,7 @@ export default function Home() {
                 <div className="countbox"><span>2026</span><small>année</small></div>
               </div>
               <div className="actions">
-                <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
+                <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>\n                <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
                 <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
               </div>
               {shareMsg && <p className="latest" role="status">{shareMsg}</p>}
@@ -208,6 +236,46 @@ export default function Home() {
             <div className="mapbox">
               <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>Cocody Angré Mahou</p><small>Près de Laser Park<br />Repère indicatif</small></div>
             </div>
+          </div>
+        </section>
+
+        <section className="section soft" id="rsvp">
+          <div className="shell">
+            <div className="section-head">
+              <div className="eyebrow">Votre réponse nous aide à nous organiser</div>
+              <h2>Confirmer votre présence</h2>
+              <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
+            </div>
+            <form className="rsvp-form" onSubmit={submitRsvp}>
+              <label htmlFor="guest-name">Votre nom et prénom</label>
+              <input id="guest-name" name="guestName" autoComplete="name" maxLength={120} required value={guestName} onChange={event => setGuestName(event.target.value)} placeholder="Ex. : Marie Kouassi" />
+              <fieldset>
+                <legend>Serez-vous présent(e) ?</legend>
+                <label className="rsvp-choice">
+                  <input type="radio" name="attending" value="yes" checked={attending === 'yes'} onChange={() => setAttending('yes')} />
+                  Oui, je serai présent(e)
+                </label>
+                <label className="rsvp-choice">
+                  <input type="radio" name="attending" value="no" checked={attending === 'no'} onChange={() => setAttending('no')} />
+                  Non, je ne pourrai pas venir
+                </label>
+              </fieldset>
+              {attending === 'yes' && (
+                <div>
+                  <label htmlFor="person-count">Nombre total de personnes (vous compris)</label>
+                  <select id="person-count" value={personCount} onChange={event => setPersonCount(event.target.value)}>
+                    {Array.from({ length: 10 }, (_, index) => String(index + 1)).map(value => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="rsvp-trap" aria-hidden="true">
+                <label htmlFor="rsvp-website">Ne pas remplir ce champ</label>
+                <input id="rsvp-website" tabIndex={-1} autoComplete="off" />
+              </div>
+              <button className="button" type="submit" disabled={rsvpBusy}>{rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}</button>
+              {rsvpStatus && <p className="rsvp-status" role="status" aria-live="polite">{rsvpStatus}</p>}
+              <p className="rsvp-privacy">Votre réponse est réservée à l’organisation de la cérémonie et n’est pas affichée publiquement.</p>
+            </form>
           </div>
         </section>
 
