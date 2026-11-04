@@ -96,30 +96,60 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
     },
     async set(content) {
       const { items, faq, ...siteValues } = content;
+      // site_content.key has a UNIQUE constraint in the live schema, so this upsert is valid.
+      // Legacy announcement and whatsapp rows are left untouched.
       const siteResult = await supabase.from('site_content').upsert(
         { key: 'content', value: siteValues, updated_at: new Date().toISOString() },
         { onConflict: 'key' },
       );
       if (siteResult.error) throw siteResult.error;
 
-      const programDelete = await supabase.from('program_items').delete().not('id', 'is', null);
-      if (programDelete.error) throw programDelete.error;
-      if (items.length) {
-        const programInsert = await supabase.from('program_items').insert(items.map((item, index) => ({
-          title: item.title, detail: item.detail, confirmed: item.confirmed, sort_order: index,
-        })));
-        if (programInsert.error) throw programInsert.error;
-      }
+      const syncItems = async (
+        table: 'program_items' | 'faq_items',
+        nextItems: Item[],
+        toRow: (item: Item, sortOrder: number) => Record<string, unknown>,
+      ) => {
+        const { data: existingRows, error: readError } = await supabase
+          .from(table)
+          .select('id');
+        if (readError) throw readError;
 
-      const faqDelete = await supabase.from('faq_items').delete().not('id', 'is', null);
-      if (faqDelete.error) throw faqDelete.error;
-      if (faq.length) {
-        const faqInsert = await supabase.from('faq_items').insert(faq.map((item, index) => ({
-          question: item.title, answer: item.detail, confirmed: item.confirmed, sort_order: index,
-        })));
-        if (faqInsert.error) throw faqInsert.error;
-      }
-    },
+        const existingIds = new Set((existingRows ?? []).map(row => String(row.id)));
+        const retainedIds = new Set<string>();
+
+        // Insert or update first. If any operation fails, no existing row is deleted.
+        for (const [index, item] of nextItems.entries()) {
+          const row = toRow(item, index);
+          if (existingIds.has(item.id)) {
+            const { error } = await supabase.from(table).update(row).eq('id', item.id);
+            if (error) throw error;
+            retainedIds.add(item.id);
+          } else {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id);
+            const { error } = await supabase.from(table).insert({
+              ...(isUuid ? { id: item.id } : {}),
+              ...row,
+            });
+            if (error) throw error;
+          }
+        }
+
+        // Remove only rows explicitly omitted from the submitted list, and only after
+        // every requested insert/update has succeeded.
+        const removedIds = [...existingIds].filter(id => !retainedIds.has(id));
+        if (removedIds.length) {
+          const { error } = await supabase.from(table).delete().in('id', removedIds);
+          if (error) throw error;
+        }
+      };
+
+      await syncItems('program_items', items, (item, sortOrder) => ({
+        title: item.title, detail: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
+      }));
+      await syncItems('faq_items', faq, (item, sortOrder) => ({
+        question: item.title, answer: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
+      }));
+    }
   };
 }
 
