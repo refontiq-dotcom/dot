@@ -94,6 +94,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       return {
         ...initialContent,
         ...value,
+        pagne: { ...initialContent.pagne, ...(value.pagne ?? {}) },
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: Array.isArray(programResult.data)
