@@ -69,7 +69,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
   return {
     async get() {
       const [siteResult, programResult, faqResult] = await Promise.all([
-        supabase.from('site_content').select('value').eq('key', 'content').maybeSingle(),
+        supabase.from('site_content').select('key, value').in('key', ['content', 'announcement', 'whatsapp']),
         supabase.from('program_items').select('id, title, detail, confirmed, sort_order').order('sort_order', { ascending: true }),
         supabase.from('faq_items').select('id, question, answer, confirmed, sort_order').order('sort_order', { ascending: true }),
       ]);
@@ -77,10 +77,15 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       if (programResult.error) throw programResult.error;
       if (faqResult.error) throw faqResult.error;
 
-      const value = (siteResult.data?.value ?? {}) as Partial<Content>;
+      const rows = siteResult.data ?? [];
+      const value = (rows.find(row => row.key === 'content')?.value ?? {}) as Partial<Content>;
+      const legacyAnnouncement = rows.find(row => row.key === 'announcement')?.value as { text?: string } | undefined;
+      const legacyWhatsApp = rows.find(row => row.key === 'whatsapp')?.value as { number?: string } | undefined;
       return {
         ...initialContent,
         ...value,
+        announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
+        refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: programResult.data?.length
           ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed }))
           : (value.items ?? initialContent.items),
