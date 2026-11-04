@@ -106,7 +106,7 @@ export default function AdminPage() {
         <article className="admin-stat"><span>Présences confirmées</span><strong>{yes}</strong><small><UserCheck size={14}/> réponses positives</small></article>
         <article className="admin-stat"><span>Personnes attendues</span><strong>{total}</strong><small>Répondants compris</small></article>
         <article className="admin-stat"><span>Indisponibilités</span><strong>{no}</strong><small><UserX size={14}/> réponses négatives</small></article></div>
-        <div className="admin-panel"><h3>Raccourcis</h3><div className="admin-shortcuts"><button onClick={()=>setTab('event')}><MapPin/> Modifier lieu et itinéraire</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('guests')}><Users/> Voir les invités</button></div></div>
+        <div className="admin-panel"><h3>Raccourcis</h3><div className="admin-shortcuts"><button onClick={()=>setTab('event')}><MapPin/> Modifier lieu et itinéraire</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('guests')}><Users/> Voir les invités</button><button onClick={()=>setTab('pagne')}><ImagePlus/> Ajouter la photo du pagne</button></div></div>
         <div className="admin-panel"><h3>Informations actuelles</h3><p><b>Date :</b> {content.eventDate} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p><p><b>Étapes :</b> {content.items.length} · <b>Questions :</b> {content.faq.length}</p></div></>}
 
       {tab==='event'&&<div className="admin-panel"><h3>Informations de la cérémonie</h3><p className="admin-muted">Ces informations seront publiées sur l’invitation après enregistrement.</p><div className="admin-form-grid">
@@ -132,17 +132,20 @@ export default function AdminPage() {
 
       {tab==='pagne'&&<div className="admin-panel"><h3>Le pagne de la dot</h3>
         <p className="admin-muted">Une présentation simple : photo, prix et contacts directs des vendeurs.</p>
+        <div className="admin-edit-card">
+          <div className="admin-edit-card-head"><b>Photo du pagne</b><ImagePlus size={20}/></div>
+          {content.pagne.imageUrl&&<img className="admin-pagne-preview" src={content.pagne.imageUrl} alt="Aperçu du pagne"/>}
+          <label htmlFor="pagne-image">Téléverser ou remplacer la photo</label>
+          <input id="pagne-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPagneImage} disabled={uploadingPagne}/>
+          <p className="admin-muted">{uploadingPagne?'Téléversement en cours…':'JPG, PNG ou WebP · 5 Mo maximum. La photo est publiée dès son envoi.'}</p>
+          <label htmlFor="pagne-image-url">Ou coller le lien d’une photo en ligne</label>
+          <input id="pagne-image-url" type="url" value={content.pagne.imageUrl} onChange={e=>field('pagne',{...content.pagne,imageUrl:e.target.value})} placeholder="https://exemple.com/photo-pagne.jpg"/>
+          <p className="admin-muted">Le lien est enregistré avec le bouton « Enregistrer le pagne et les contacts ».</p>
+        </div>
         <label className="admin-checkbox"><input type="checkbox" checked={content.pagne.enabled} onChange={e=>field('pagne',{...content.pagne,enabled:e.target.checked})}/> Afficher le pagne sur l’invitation</label>
         <div className="admin-form-grid">
           <div><label>Prix (FCFA)</label><input type="number" min="0" step="50" value={content.pagne.price} onChange={e=>field('pagne',{...content.pagne,price:Number(e.target.value)})}/></div>
           <div className="admin-full"><label>Description courte</label><textarea value={content.pagne.description} onChange={e=>field('pagne',{...content.pagne,description:e.target.value})}/></div>
-        </div>
-        <div className="admin-edit-card">
-          <div className="admin-edit-card-head"><b>Photo du pagne</b><ImagePlus size={20}/></div>
-          {content.pagne.imageUrl&&<img className="admin-pagne-preview" src={content.pagne.imageUrl} alt="Aperçu du pagne"/>}
-          <label htmlFor="pagne-image">Choisir ou remplacer la photo</label>
-          <input id="pagne-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPagneImage} disabled={uploadingPagne}/>
-          <p className="admin-muted">{uploadingPagne?'Téléversement en cours…':'JPG, PNG ou WebP · 5 Mo maximum. La photo est publiée dès son envoi.'}</p>
         </div>
         <div className="admin-inline-head"><div><h3>Contacts des vendeurs</h3><p className="admin-muted">Chaque numéro affiche les boutons Appeler et WhatsApp.</p></div><button className="button secondary small" onClick={addPagneContact}><Plus size={16}/> Ajouter un vendeur</button></div>
         {content.pagne.contacts.map((contact,i)=><div className="admin-edit-card" key={contact.id}>

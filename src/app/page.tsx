@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import Image from 'next/image';
 import {
   CalendarDays,
   MapPin,
@@ -12,7 +11,6 @@ import {
   House,
   CalendarCheck,
   CircleHelp,
-  Share2,
   Navigation,
   Info,
   ShoppingBag,
@@ -20,8 +18,6 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 type RsvpReceipt = { guestName: string; attending: boolean; personCount: number };
 
@@ -32,7 +28,6 @@ function Calendar() {
 export default function Home() {
   const [content, setContent] = useState<Content>(initialContent);
   const [updated, setUpdated] = useState<string>('');
-  const [shareMsg, setShareMsg] = useState('');
   const [guestName, setGuestName] = useState('');
   const [attending, setAttending] = useState('yes');
   const [personCount, setPersonCount] = useState('1');
@@ -88,7 +83,7 @@ export default function Home() {
       setNow(Date.now());
     };
     tick();
-    const intervalId = window.setInterval(tick, 30_000);
+    const intervalId = window.setInterval(tick, 1_000);
     return () => window.clearInterval(intervalId);
   }, [content.eventDate, content.eventTime]);
 
@@ -149,17 +144,18 @@ export default function Home() {
     if (now === null) return { state: 'pending' as const };
     const diff = eventDate.getTime() - now;
     if (diff <= 0) return { state: 'past' as const };
-    const totalMinutes = Math.floor(diff / 60_000);
-    if (new Date(now).toISOString().slice(0, 10) === content.eventDate) {
-      return { state: 'today' as const, hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
-    }
-    return { state: 'upcoming' as const, days: Math.ceil(diff / DAY_IN_MS) };
+    const totalSeconds = Math.floor(diff / 1_000);
+    return {
+      state: 'remaining' as const,
+      days: Math.floor(totalSeconds / 86_400),
+      hours: Math.floor((totalSeconds % 86_400) / 3_600),
+      minutes: Math.floor((totalSeconds % 3_600) / 60),
+      seconds: totalSeconds % 60,
+    };
   })();
-  const countdownLabel = countdown.state === 'upcoming'
-    ? `Cérémonie dans ${countdown.days} ${countdown.days > 1 ? 'jours' : 'jour'}`
-    : countdown.state === 'today'
-      ? `Cérémonie aujourd’hui, dans ${countdown.hours} h ${String(countdown.minutes).padStart(2, '0')}`
-      : `Cérémonie le ${formattedEventDate} à ${formattedEventTime}`;
+  const countdownLabel = countdown.state === 'remaining'
+    ? `Cérémonie dans ${countdown.days} ${countdown.days > 1 ? 'jours' : 'jour'}, ${countdown.hours} h ${String(countdown.minutes).padStart(2, '0')} min et ${String(countdown.seconds).padStart(2, '0')} s`
+    : `Cérémonie le ${formattedEventDate} à ${formattedEventTime}`;
   const stamp = updated || 'Mise à jour non renseignée';
   const venueMapUrl = (() => {
     try {
@@ -205,26 +201,6 @@ export default function Home() {
     }
   }
 
-  async function share() {
-    const shareData = {
-      title: `La dot d’${content.groomName} & ${content.brideName}`,
-      text: `Retrouvons-nous le ${formattedEventDate} à ${formattedEventTime} à ${content.venue}, ${content.venueDetail}.`,
-      url: window.location.href,
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        setShareMsg('Merci d’avoir partagé cette invitation.');
-        return;
-      }
-      await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-      setShareMsg('Le lien de l’invitation a été copié.');
-    } catch {
-      setShareMsg('Le partage n’a pas pu être effectué. Vous pouvez copier le lien depuis la barre d’adresse.');
-    }
-  }
-
   return (
     <>
       <a className="skip-link" href="#contenu">Aller au contenu principal</a>
@@ -256,17 +232,12 @@ export default function Home() {
               </h2>
               <div className="date-pill"><Calendar /><span>{formattedEventDate} · {formattedEventTime}</span></div>
               <div className="countdown" aria-label={countdownLabel}>
-                {countdown.state === 'upcoming' ? (
+                {countdown.state === 'remaining' ? (
                   <>
                     <div className="countbox"><span>{countdown.days}</span><small>{countdown.days > 1 ? 'jours' : 'jour'}</small></div>
-                    <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>{monthShort}</small></div>
-                    <div className="countbox"><span>{eventDate.getUTCFullYear()}</span><small>année</small></div>
-                  </>
-                ) : countdown.state === 'today' ? (
-                  <>
-                    <div className="countbox"><span>{countdown.hours}</span><small>{countdown.hours > 1 ? 'heures' : 'heure'}</small></div>
+                    <div className="countbox"><span>{String(countdown.hours).padStart(2, '0')}</span><small>{countdown.hours > 1 ? 'heures' : 'heure'}</small></div>
                     <div className="countbox"><span>{String(countdown.minutes).padStart(2, '0')}</span><small>{countdown.minutes > 1 ? 'minutes' : 'minute'}</small></div>
-                    <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>jour J</small></div>
+                    <div className="countbox"><span>{String(countdown.seconds).padStart(2, '0')}</span><small>{countdown.seconds > 1 ? 'secondes' : 'seconde'}</small></div>
                   </>
                 ) : (
                   <>
@@ -277,18 +248,9 @@ export default function Home() {
               </div>
               {countdown.state === 'past' && <p className="latest">La cérémonie a eu lieu le {formattedEventDate}.</p>}
               <div className="actions">
-                <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
                 {content.pagne.enabled && <a className="button accent" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
-                <a className="button" href="#rsvp">Confirmer ma présence</a>
-                <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
-              </div>
-              {shareMsg && <p className="latest" role="status">{shareMsg}</p>}
-            </div>
-            <div className="portrait">
-              <Image src="/couple-frederic-vanessa.jpg" alt="Frédéric et Vanessa, en tenue traditionnelle bleue et dorée" fill priority sizes="(max-width: 760px) 100vw, 45vw" className="portrait-photo" />
-              <div className="portrait-seal">
-                <span>F <span style={{ color: 'var(--accent)' }}>&amp;</span> V</span>
-                <small>{content.eventDate.split('-').reverse().join(' · ')}</small>
+                <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
+                <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
             </div>
           </div>
