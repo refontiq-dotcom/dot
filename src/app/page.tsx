@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 
-const eventDate = new Date('2026-12-12T14:00:00+00:00');
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function Calendar() {
@@ -33,9 +32,10 @@ export default function Home() {
   const [rsvpStatus, setRsvpStatus] = useState('');
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
-  const [remaining, setRemaining] = useState<number>(() =>
-    Math.max(0, eventDate.getTime() - Date.now()),
-  );
+  const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
+  const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
+  const formattedEventTime = content.eventTime.replace(':', ' h ');
+  const [remaining, setRemaining] = useState<number>(() => Math.max(0, eventDate.getTime() - Date.now()));
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +70,7 @@ export default function Home() {
     tick();
     const intervalId = window.setInterval(tick, 60_000);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [content.eventDate, content.eventTime]);
 
   const days = Math.ceil(remaining / DAY_IN_MS);
   const stamp = updated || 'Mise à jour non renseignée';
@@ -101,8 +101,8 @@ export default function Home() {
 
   async function share() {
     const shareData = {
-      title: 'La dot d’Anougbre Brou Frédéric & Dukoua You Vanessa',
-      text: 'Retrouvons-nous le samedi 12 décembre 2026 à 14 h à Cocody Angré Mahou, près de Laser Park.',
+      title: 'La dot d’${content.groomName} & ${content.brideName}',
+      text: `Retrouvons-nous le ${formattedEventDate} à ${formattedEventTime} à ${content.venue}, ${content.venueDetail}.`,
       url: window.location.href,
     };
 
@@ -141,12 +141,12 @@ export default function Home() {
             <div>
               <div className="eyebrow">Une célébration de famille</div>
               <h1 className="serif">Deux héritages,<br />une même union</h1>
-              <p className="lead">Avec joie, les familles Anougbre et Dukoua vous invitent à célébrer la dot traditionnelle de</p>
+              <p className="lead">Avec joie, les familles {content.familyNames} vous invitent à célébrer la dot traditionnelle de</p>
               <h2 className="serif" style={{ fontSize: 'clamp(25px,4vw,34px)', marginBottom: 8 }}>
-                Anougbre Brou Frédéric<br />
+                {content.groomName}<br />
                 <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>&amp;</span> Dukoua You Vanessa
               </h2>
-              <div className="date-pill"><Calendar /><span>Samedi 12 décembre 2026 · 14 h 00</span></div>
+              <div className="date-pill"><Calendar /><span>{formattedEventDate} · {formattedEventTime}</span></div>
               <div className="countdown" aria-label={`Dans ${days} jours`}>
                 <div className="countbox"><span>{days}</span><small>jours</small></div>
                 <div className="countbox"><span>12</span><small>déc.</small></div>
@@ -177,9 +177,9 @@ export default function Home() {
               <p>Retrouvez ici les informations utiles, faciles à consulter et à partager avec vos proches.</p>
             </div>
             <div className="grid3">
-              <article className="card"><div className="iconbox"><CalendarCheck /></div><h3>Quand ?</h3><p>Samedi 12 décembre 2026<br />À partir de 14 h 00</p></article>
-              <article className="card"><div className="iconbox"><MapPin /></div><h3>Où ?</h3><p>Cocody Angré Mahou<br />Près de Laser Park</p></article>
-              <article className="card"><div className="iconbox"><Heart /></div><h3>Avec qui ?</h3><p>Les familles Anougbre<br />et Dukoua</p></article>
+              <article className="card"><div className="iconbox"><CalendarCheck /></div><h3>Quand ?</h3><p>{formattedEventDate}<br />À partir de {formattedEventTime}</p></article>
+              <article className="card"><div className="iconbox"><MapPin /></div><h3>Où ?</h3><p>{content.venue}<br />{content.venueDetail}</p></article>
+              <article className="card"><div className="iconbox"><Heart /></div><h3>Avec qui ?</h3><p>Les familles {content.familyNames}</p></article>
             </div>
           </div>
         </section>
@@ -232,13 +232,13 @@ export default function Home() {
             <div>
               <div className="eyebrow">Retrouvons-nous</div>
               <h2>Comment venir ?</h2>
-              <p style={{ color: 'var(--muted)' }}>Cocody Angré Mahou, près de Laser Park.</p>
-              <p>Un repère facilement partageable : <strong>Laser Park</strong>, à Cocody Angré Mahou. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
-              <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> Adresse précise et lien cartographique à confirmer.</div>
-              <a href="https://www.google.com/maps/search/?api=1&query=Laser+Park+Cocody+Angre+Mahou" target="_blank" rel="noreferrer" className="button secondary" style={{ marginTop: 16 }}><Navigation size={17} /> Chercher le repère</a>
+              <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
+              <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
+              <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
+              <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button secondary" style={{ marginTop: 16 }}><Navigation size={17} /> Chercher le repère</a>
             </div>
             <div className="mapbox">
-              <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>Cocody Angré Mahou</p><small>Près de Laser Park<br />Repère indicatif</small></div>
+              <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
             </div>
           </div>
         </section>
