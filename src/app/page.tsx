@@ -275,7 +275,27 @@ export default function Home() {
               <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
               <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
               <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-              <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button secondary" style={{ marginTop: 16 }}><Navigation size={17} /> Chercher le repère</a>
+              <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button secondary" style={{ marginTop: 16 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
+              <div className="card" style={{ marginTop: 24 }}>
+                <div className="eyebrow">Venir en transport en commun</div>
+                <h3>En bus SOTRA</h3>
+                <p>Descendez au niveau du commissariat du 22e arrondissement, puis suivez l’itinéraire indiqué vers Laser Park et le lieu de réception. Selon la ligne, demandez au receveur de vous confirmer l’arrêt le plus proche.</p>
+                <ul>
+                  <li><strong>81 :</strong> Gare Nord (Adjamé) → Angré.</li>
+                  <li><strong>82 :</strong> Gare Sud (Plateau) → Angré.</li>
+                  <li><strong>90 :</strong> Cocody Blockauss → Angré.</li>
+                  <li><strong>719 :</strong> Yopougon Saint-André → Terminus Angré 81-82.</li>
+                  <li><strong>775 :</strong> Angré Château ↔ CHU de Treichville.</li>
+                  <li><strong>704 :</strong> Angré / Abobo Baoulé ↔ Saint-Jean.</li>
+                </ul>
+                <p className="latest">À noter : les lignes 704 et 775 desservent des arrêts du secteur, notamment Pharmacie Angré / Petro Ivoire. Vérifiez auprès du chauffeur l’arrêt adapté au commissariat du 22e. La ligne 732 n’est pas encore confirmée.</p>
+              </div>
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="eyebrow">Venir en taxi ou en voiture</div>
+                <h3>Taxi compteur, Yango ou véhicule personnel</h3>
+                <p><strong>En taxi ou avec Yango :</strong> indiquez « Laser Park, Cocody Angré Mahou » comme destination. Une fois arrivé, suivez le court itinéraire à pied jusqu’au lieu de réception.</p>
+                <p><strong>Avec votre propre voiture :</strong> ouvrez l’itinéraire Google Maps ci-dessus et suivez le trajet jusqu’au lieu de réception.</p>
+              </div>
             </div>
             <div className="mapbox">
               <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
