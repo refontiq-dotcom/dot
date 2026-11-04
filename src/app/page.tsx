@@ -238,7 +238,7 @@ export default function Home() {
                 <p><strong>Refontiq</strong> crée des solutions numériques sur mesure pour aider les entreprises à mieux présenter leur activité, toucher leurs clients et se développer en ligne.</p>
                 <div style={{ marginTop: 20 }}>
                   {content.refoWhatsApp
-                    ? <a className="button clay" href={`https://wa.me/${content.refoWhatsApp.replace(/\\D/g, '')}`} target="_blank" rel="noreferrer">Parler à Refontiq sur WhatsApp</a>
+                    ? <a className="button clay" href={`https://wa.me/${content.refoWhatsApp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">Parler à Refontiq sur WhatsApp</a>
                     : <span className="tag">WhatsApp Refontiq : numéro à configurer</span>}
                 </div>
               </div>
