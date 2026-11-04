@@ -71,12 +71,12 @@ export default function AdminPage() {
   const shown=useMemo(()=>guests.filter(g=>g.guest_name.toLowerCase().includes(search.trim().toLowerCase())&&(filter==='all'||(filter==='yes'&&g.confirmed)||(filter==='no'&&!g.confirmed))),[guests,search,filter]);
   const yes=guests.filter(g=>g.confirmed).length,no=guests.length-yes,total=guests.reduce((s,g)=>s+(g.confirmed?g.person_count:0),0);
   function exportCsv(){const rows=[['Nom','Réponse','Nombre de personnes','Date'],...shown.map(g=>[g.guest_name,g.confirmed?'Présent(e)':'Absent(e)',String(g.person_count),new Date(g.created_at).toLocaleString('fr-FR')])];
-    const csv='\uFEFF'+rows.map(row=>row.map(x=>{const safe=/^[=+\\-@]/.test(x)?`'${x}`:x;return '"'+safe.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');
+    const csv='\uFEFF'+rows.map(row=>row.map(x=>{const safe=/^[=+\-@]/.test(x)?`'${x}`:x;return '"'+safe.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download='liste-invites-dot.csv';a.click();URL.revokeObjectURL(url);
   }
   if(!ready)return <main className="admin-wrap"><div className="shell">Vérification de la session…</div></main>;
   if(!logged)return <main className="admin-wrap admin-login"><section className="admin-login-card">
-    <div className="admin-login-mark"><LockKeyhole size={25}/></div><div className="eyebrow">Accès réservé à l'organisation</div><h1>Espace organisateurs</h1>
+    <div className="admin-login-mark"><LockKeyhole size={25}/></div><div className="eyebrow">Accès réservé à l&apos;organisation</div><h1>Espace organisateurs</h1>
     <p>Le compte est prérempli. Saisissez uniquement le mot de passe partagé par les organisateurs.</p>
     <form onSubmit={login}><label htmlFor="admin-password">Mot de passe</label><input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Saisissez le mot de passe"/>
     {loginError&&<p className="admin-error" role="alert">{loginError}</p>}<button className="button admin-login-submit" disabled={busy}>{busy?'Connexion…':'Se connecter'}</button></form>
