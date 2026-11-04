@@ -13,7 +13,7 @@ La démo ne nécessite aucun compte ou service externe. Les modifications sont c
 
 ## État des informations
 
-Les décisions non fournies restent marquées « À confirmer ». L’adresse cartographique précise, les étapes du programme, les réponses de logistique et le numéro WhatsApp de Refontiq ne sont pas inventés. Le lien cartographique public est uniquement une recherche autour du repère Laser Park. Les couleurs de marque sont #54233D, #B85D43, #F2E8D8 et #332B40; aucun doré n’est utilisé.
+Les décisions non fournies restent marquées « À confirmer ». L’adresse cartographique précise, les étapes du programme, les réponses de logistique et le numéro WhatsApp de Refontiq ne sont pas inventés. Le lien cartographique public est le lien de partage confirmé par les familles, modifiable depuis l’administration. Les couleurs de marque sont le bleu profond #0B2F73, le turquoise #0F7E9B, le sable #F5E7D2 et l’encre #101C2A, reprises du pagne de la dot.
 
 ## Architecture prévue pour une activation réelle
 

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import Image from 'next/image';
 import {
   CalendarDays,
   MapPin,
   Megaphone,
   Clock3,
   Heart,
+  PartyPopper,
   House,
   CalendarCheck,
   CircleHelp,
@@ -21,6 +23,8 @@ import { initialContent, loadContent, type Content } from '@/lib/content';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+type RsvpReceipt = { guestName: string; attending: boolean; personCount: number };
+
 function Calendar() {
   return <CalendarDays size={19} />;
 }
@@ -33,9 +37,13 @@ export default function Home() {
   const [attending, setAttending] = useState('yes');
   const [personCount, setPersonCount] = useState('1');
   const [rsvpStatus, setRsvpStatus] = useState('');
+  const [rsvpReceipt, setRsvpReceipt] = useState<RsvpReceipt | null>(null);
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [showTravelGuide, setShowTravelGuide] = useState(false);
+  const [activeSection, setActiveSection] = useState('accueil');
+  const modalRef = useRef<HTMLDivElement>(null);
+  const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -47,7 +55,7 @@ export default function Home() {
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
   const formattedEventTime = content.eventTime.replace(':', ' h ');
-  const [remaining, setRemaining] = useState<number>(() => Math.max(0, eventDate.getTime() - Date.now()));
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,16 +85,90 @@ export default function Home() {
 
   useEffect(() => {
     const tick = () => {
-      setRemaining(Math.max(0, eventDate.getTime() - Date.now()));
+      setNow(Date.now());
     };
     tick();
-    const intervalId = window.setInterval(tick, 60_000);
+    const intervalId = window.setInterval(tick, 30_000);
     return () => window.clearInterval(intervalId);
   }, [content.eventDate, content.eventTime]);
 
-  const days = Math.ceil(remaining / DAY_IN_MS);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const sections = ['accueil', 'details', 'annonces', 'lieu', 'rsvp', 'faq']
+      .map(id => document.getElementById(id))
+      .filter((section): section is HTMLElement => section !== null);
+    if (sections.length === 0) return;
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.2, 0.5, 1] });
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!rsvpReceipt) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const bodyOverflow = document.body.style.overflow;
+    modalCloseRef.current?.focus();
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setRsvpReceipt(null);
+        return;
+      }
+      if (event.key !== 'Tab' || !modalRef.current) return;
+      const focusable = Array.from(modalRef.current.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'))
+        .filter(element => !element.hasAttribute('disabled'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = bodyOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [rsvpReceipt]);
+
+  const monthShort = new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' }).format(eventDate).replace('.', '');
+  const countdown = (() => {
+    if (now === null) return { state: 'pending' as const };
+    const diff = eventDate.getTime() - now;
+    if (diff <= 0) return { state: 'past' as const };
+    const totalMinutes = Math.floor(diff / 60_000);
+    if (new Date(now).toISOString().slice(0, 10) === content.eventDate) {
+      return { state: 'today' as const, hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
+    }
+    return { state: 'upcoming' as const, days: Math.ceil(diff / DAY_IN_MS) };
+  })();
+  const countdownLabel = countdown.state === 'upcoming'
+    ? `Cérémonie dans ${countdown.days} ${countdown.days > 1 ? 'jours' : 'jour'}`
+    : countdown.state === 'today'
+      ? `Cérémonie aujourd’hui, dans ${countdown.hours} h ${String(countdown.minutes).padStart(2, '0')}`
+      : `Cérémonie le ${formattedEventDate} à ${formattedEventTime}`;
   const stamp = updated || 'Mise à jour non renseignée';
-  const venueMapUrl = 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48';
+  const venueMapUrl = (() => {
+    try {
+      const parsed = new URL(content.mapUrl);
+      return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : initialContent.mapUrl;
+    } catch {
+      return initialContent.mapUrl;
+    }
+  })();
 
   async function submitRsvp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,7 +182,7 @@ export default function Home() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
-      setRsvpStatus('Merci ! Votre réponse a bien été enregistrée.');
+      setRsvpReceipt({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0 });
       const travelGuideUnlocked = attending === 'yes';
       setShowTravelGuide(travelGuideUnlocked);
       try {
@@ -145,9 +227,10 @@ export default function Home() {
 
   return (
     <>
+      <a className="skip-link" href="#contenu">Aller au contenu principal</a>
       <header className="topbar">
         <div className="shell nav">
-          <a href="#accueil" className="brand">A <span style={{ color: 'var(--clay)' }}>×</span> D</a>
+          <a href="#accueil" className="brand">F <span style={{ color: 'var(--accent)' }}>×</span> V</a>
           <nav className="navlinks" aria-label="Navigation principale">
             <a href="#details">La cérémonie</a>
             {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
@@ -160,35 +243,51 @@ export default function Home() {
         </div>
       </header>
 
-      <main>
+      <main id="contenu" tabIndex={-1}>
         <section className="hero" id="accueil">
           <div className="shell hero-grid">
             <div>
               <div className="eyebrow">Une célébration de famille</div>
               <h1 className="serif">Deux héritages,<br />une même union</h1>
-              <p className="lead">Avec joie, les familles {content.familyNames} vous invitent à célébrer la dot traditionnelle de</p>
+              <p className="lead">Avec joie, les familles {content.familyNames} vous invitent à célébrer la dot traditionnelle :</p>
               <h2 className="serif" style={{ fontSize: 'clamp(25px,4vw,34px)', marginBottom: 8 }}>
                 {content.groomName}<br />
-                <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>&amp;</span> {content.brideName}
+                <span style={{ fontStyle: 'italic', color: 'var(--accent)' }}>&amp;</span> {content.brideName}
               </h2>
               <div className="date-pill"><Calendar /><span>{formattedEventDate} · {formattedEventTime}</span></div>
-              <div className="countdown" aria-label={`Dans ${days} jours`}>
-                <div className="countbox"><span>{days}</span><small>jours</small></div>
-                <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>{new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' }).format(eventDate).replace('.', '')}</small></div>
-                <div className="countbox"><span>{eventDate.getUTCFullYear()}</span><small>année</small></div>
+              <div className="countdown" aria-label={countdownLabel}>
+                {countdown.state === 'upcoming' ? (
+                  <>
+                    <div className="countbox"><span>{countdown.days}</span><small>{countdown.days > 1 ? 'jours' : 'jour'}</small></div>
+                    <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>{monthShort}</small></div>
+                    <div className="countbox"><span>{eventDate.getUTCFullYear()}</span><small>année</small></div>
+                  </>
+                ) : countdown.state === 'today' ? (
+                  <>
+                    <div className="countbox"><span>{countdown.hours}</span><small>{countdown.hours > 1 ? 'heures' : 'heure'}</small></div>
+                    <div className="countbox"><span>{String(countdown.minutes).padStart(2, '0')}</span><small>{countdown.minutes > 1 ? 'minutes' : 'minute'}</small></div>
+                    <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>jour J</small></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="countbox"><span>{eventDate.getUTCDate()}</span><small>{monthShort}</small></div>
+                    <div className="countbox"><span>{eventDate.getUTCFullYear()}</span><small>année</small></div>
+                  </>
+                )}
               </div>
+              {countdown.state === 'past' && <p className="latest">La cérémonie a eu lieu le {formattedEventDate}.</p>}
               <div className="actions">
-                <a className="button" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
-                {content.pagne.enabled && <a className="button clay" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
-                <a className="button secondary" href="#rsvp">Confirmer ma présence</a>
+                <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
+                {content.pagne.enabled && <a className="button accent" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
+                <a className="button" href="#rsvp">Confirmer ma présence</a>
                 <button type="button" onClick={share} className="button secondary"><Share2 size={17} /> Partager</button>
               </div>
               {shareMsg && <p className="latest" role="status">{shareMsg}</p>}
             </div>
-            <div className="portrait" aria-label="Monogramme des familles Anougbre et Dukoua">
-              <div className="portrait-inner">
-                <small>Une union</small>
-                <span className="initials">A <span style={{ color: 'var(--clay)' }}>&amp;</span> D</span>
+            <div className="portrait">
+              <Image src="/couple-frederic-vanessa.jpg" alt="Frédéric et Vanessa, en tenue traditionnelle bleue et dorée" fill priority sizes="(max-width: 760px) 100vw, 45vw" className="portrait-photo" />
+              <div className="portrait-seal">
+                <span>F <span style={{ color: 'var(--accent)' }}>&amp;</span> V</span>
                 <small>{content.eventDate.split('-').reverse().join(' · ')}</small>
               </div>
             </div>
@@ -254,7 +353,7 @@ export default function Home() {
               <div>
                 <h3>Information des familles</h3>
                 <p>{content.announcement}</p>
-                <div className="latest" style={{ color: '#e7dce3' }}>Mis à jour : {stamp}</div>
+                <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>
               </div>
             </div>
             <p className="latest"><Info size={14} style={{ verticalAlign: '-2px' }} /> Les détails encore en préparation sont indiqués « à confirmer ».</p>
@@ -266,7 +365,7 @@ export default function Home() {
             <div>
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
-              <p style={{ color: 'var(--muted)' }}>Les familles complèteront cette page au fur et à mesure. Seules les informations confirmées sont présentées comme définitives.</p>
+              <p style={{ color: 'var(--muted)' }}>Les familles compléteront cette page au fur et à mesure. Seules les informations confirmées sont présentées comme définitives.</p>
               <div className="timeline">
                 {content.items.map(item => (
                   <div className="timeline-item" key={item.id}>
@@ -297,6 +396,9 @@ export default function Home() {
               <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
               <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
               <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
+              <div style={{ marginTop: 16 }}>
+                <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
+              </div>
               {showTravelGuide ? (
                 <div className="travel-guide" aria-live="polite">
                   <div className="card" style={{ marginTop: 24 }}>
@@ -375,7 +477,7 @@ export default function Home() {
                 <input id="rsvp-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
               </div>
               <button className="button" type="submit" disabled={rsvpBusy}>{rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}</button>
-              {rsvpStatus && <p className="rsvp-status" role="status" aria-live="polite">{rsvpStatus}</p>}
+              {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
               <p className="rsvp-privacy">Votre réponse est réservée à l’organisation de la cérémonie et n’est pas affichée publiquement.</p>
             </form>
           </div>
@@ -399,21 +501,12 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="section soft">
-          <div className="shell">
-            <div className="promo">
-              <div>
-                <div className="eyebrow" style={{ color: '#e7b4a0' }}>Un projet pour votre activité ?</div>
-                <h2>Votre savoir-faire mérite aussi sa vitrine en ligne.</h2>
-                <p><strong>Refontiq</strong> crée des solutions numériques sur mesure pour aider les entreprises à mieux présenter leur activité, toucher leurs clients et se développer en ligne.</p>
-                <div style={{ marginTop: 20 }}>
-                  {content.refoWhatsApp
-                    ? <a className="button clay" href={`https://wa.me/${content.refoWhatsApp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">Parler à Refontiq sur WhatsApp</a>
-                    : <span className="tag">WhatsApp Refontiq : numéro à configurer</span>}
-                </div>
-              </div>
-              <div className="promo-mark">refontiq<span style={{ color: '#e09176' }}>.</span></div>
-            </div>
+        <section className="refontiq-band" aria-label="À propos de ce site">
+          <div className="shell refontiq-note">
+            <span>Invitation conçue par <strong>Refontiq</strong>. Vous souhaitez un site comme celui-ci pour votre événement ?</span>
+            {content.refoWhatsApp && (
+              <a href={`https://wa.me/${content.refoWhatsApp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">Contacter Refontiq sur WhatsApp</a>
+            )}
           </div>
         </section>
       </main>
@@ -426,12 +519,63 @@ export default function Home() {
       </footer>
 
       <nav className="mobile-nav" aria-label="Navigation rapide">
-        <a href="#accueil"><House /><span>Accueil</span></a>
-        <a href="#details"><Calendar /><span>Infos</span></a>
-        <a href="#annonces"><Megaphone /><span>Actus</span></a>
-        <a href="#lieu"><MapPin /><span>Lieu</span></a>
-        <a href="#faq"><CircleHelp /><span>FAQ</span></a>
+        <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
+        <a href="#details" aria-current={activeSection === 'details' ? 'location' : undefined}><Calendar /><span>Infos</span></a>
+        <a href="#lieu" aria-current={activeSection === 'lieu' ? 'location' : undefined}><MapPin /><span>Lieu</span></a>
+        <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
+        <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
       </nav>
+
+      {rsvpReceipt && (
+        <div
+          className="modal-overlay"
+          onClick={event => { if (event.target === event.currentTarget) setRsvpReceipt(null); }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="rsvp-modal-title" aria-describedby="rsvp-modal-text" ref={modalRef}>
+            <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
+              {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
+            </div>
+            <div className="eyebrow">{rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
+            {rsvpReceipt.attending ? (
+              <>
+                <p id="rsvp-modal-text">
+                  Nous sommes heureux de vous compter parmi nous.{' '}
+                  {rsvpReceipt.personCount > 1
+                    ? `Vos ${rsvpReceipt.personCount} places sont réservées.`
+                    : 'Votre place est réservée.'}
+                </p>
+                <div className="modal-event">
+                  <CalendarCheck size={18} />
+                  <span>{formattedEventDate} · {formattedEventTime}<br />{content.venue}, {content.venueDetail}</span>
+                </div>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => {
+                      setRsvpReceipt(null);
+                      window.setTimeout(() => document.getElementById('lieu')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+                    }}
+                  >
+                    <Navigation size={17} /> Voir comment venir
+                  </button>
+                  <button type="button" className="button secondary" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p id="rsvp-modal-text">
+                  Votre réponse a bien été transmise aux familles. Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
+                </p>
+                <div className="modal-actions">
+                  <button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

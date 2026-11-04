@@ -36,7 +36,9 @@ export default function AdminPage() {
 
   async function login(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setLoginError('');
     try{const {error}=await getSupabase().auth.signInWithPassword({email:ADMIN_EMAIL,password});if(error)throw error;setPassword('');await checkSession();}
-    catch(e){setLoginError(e instanceof Error?e.message:'Connexion impossible.');}finally{setBusy(false);}
+    catch(e){const raw=e instanceof Error?e.message:'';
+      setLoginError(/invalid login credentials/i.test(raw)?'Mot de passe incorrect. Vérifiez votre saisie, puis réessayez.':/too many|rate limit/i.test(raw)?'Trop de tentatives. Patientez une minute avant de réessayer.':'Connexion impossible pour le moment. Réessayez dans un instant.');}
+    finally{setBusy(false);}
   }
   async function logout(){await getSupabase().auth.signOut();setLogged(false);setGuests([]);}
   function field<K extends keyof Content>(key:K,value:Content[K]){setContent(v=>({...v,[key]:value}));}
@@ -76,11 +78,11 @@ export default function AdminPage() {
   }
   if(!ready)return <main className="admin-wrap"><div className="shell">Vérification de la session…</div></main>;
   if(!logged)return <main className="admin-wrap admin-login"><section className="admin-login-card">
-    <div className="admin-login-mark"><LockKeyhole size={25}/></div><div className="eyebrow">Accès réservé à l&apos;organisation</div><h1>Espace organisateurs</h1>
-    <p>Le compte est prérempli. Saisissez uniquement le mot de passe partagé par les organisateurs.</p>
+    <div className="admin-login-mark"><LockKeyhole size={25}/></div><div className="eyebrow">Accès réservé à l’organisation</div><h1>Espace organisateurs</h1>
+    <p>L’adresse du compte est déjà renseignée. Saisissez le mot de passe communiqué par les organisateurs.</p>
     <form onSubmit={login}><label htmlFor="admin-password">Mot de passe</label><input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Saisissez le mot de passe"/>
     {loginError&&<p className="admin-error" role="alert">{loginError}</p>}<button className="button admin-login-submit" disabled={busy}>{busy?'Connexion…':'Se connecter'}</button></form>
-    <div className="admin-login-security"><ShieldCheck size={16}/> Accès protégé · réponses privées</div><Link href="/" className="admin-back-link"><ArrowLeft size={16}/> Retour à l’invitation</Link>
+    <div className="admin-login-security"><ShieldCheck size={16}/> Connexion sécurisée · réponses confidentielles</div><Link href="/" className="admin-back-link"><ArrowLeft size={16}/> Retour à l’invitation</Link>
   </section></main>;
 
   const tabs:{id:Tab;label:string;icon:ReactNode}[]=[
@@ -93,7 +95,7 @@ export default function AdminPage() {
     <header className="admin-dashboard-head"><div><div className="eyebrow">Deux héritages, une même union</div><h1>Administration</h1><p>Gestion de la cérémonie et suivi des invités</p></div>
       <div className="row"><Link href="/" className="button secondary small"><ArrowLeft size={16}/> Voir le site</Link><button className="button secondary small" onClick={logout}><LogOut size={16}/> Déconnexion</button></div>
     </header>
-    <div className="admin-dashboard-grid"><aside className="admin-menu"><div className="admin-menu-label">GESTION DU MARIAGE</div>
+    <div className="admin-dashboard-grid"><aside className="admin-menu"><div className="admin-menu-label">GESTION DE LA CÉRÉMONIE</div>
       {tabs.map(t=><button key={t.id} className={tab===t.id?'active':''} onClick={()=>setTab(t.id)}>{t.icon}<span>{t.label}</span></button>)}
       <div className="admin-menu-note">Connecté en tant que<br/><strong>{ADMIN_EMAIL}</strong></div>
     </aside><section className="admin-main">
@@ -102,7 +104,7 @@ export default function AdminPage() {
       {tab==='overview'&&<><div className="admin-stat-grid">
         <article className="admin-stat"><span>Réponses reçues</span><strong>{guests.length}</strong><small>Tous les invités ayant répondu</small></article>
         <article className="admin-stat"><span>Présences confirmées</span><strong>{yes}</strong><small><UserCheck size={14}/> réponses positives</small></article>
-        <article className="admin-stat"><span>Personnes attendues</span><strong>{total}</strong><small>Invités compris</small></article>
+        <article className="admin-stat"><span>Personnes attendues</span><strong>{total}</strong><small>Répondants compris</small></article>
         <article className="admin-stat"><span>Indisponibilités</span><strong>{no}</strong><small><UserX size={14}/> réponses négatives</small></article></div>
         <div className="admin-panel"><h3>Raccourcis</h3><div className="admin-shortcuts"><button onClick={()=>setTab('event')}><MapPin/> Modifier lieu et itinéraire</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('guests')}><Users/> Voir les invités</button></div></div>
         <div className="admin-panel"><h3>Informations actuelles</h3><p><b>Date :</b> {content.eventDate} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p><p><b>Étapes :</b> {content.items.length} · <b>Questions :</b> {content.faq.length}</p></div></>}
@@ -153,7 +155,7 @@ export default function AdminPage() {
 
       {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Réponses des invités</h3><p className="admin-muted">Liste privée accessible uniquement aux organisateurs.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Exporter CSV / Excel</button></div>
         <div className="admin-guest-tools"><div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un nom…"/></div><select value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}><option value="all">Toutes les réponses</option><option value="yes">Présences confirmées</option><option value="no">Absences</option></select></div>
-        <div className="admin-guest-summary">{shown.length} réponse(s) affichée(s) · {total} personne(s) attendue(s)</div><div className="admin-table-wrap"><table className="admin-guest-table"><thead><tr><th>Nom</th><th>Réponse</th><th>Personnes</th><th>Date</th></tr></thead><tbody>
+        <div className="admin-guest-summary">{shown.length} {shown.length > 1 ? 'réponses affichées' : 'réponse affichée'} · {total} {total > 1 ? 'personnes attendues' : 'personne attendue'}</div><div className="admin-table-wrap"><table className="admin-guest-table"><thead><tr><th>Nom</th><th>Réponse</th><th>Personnes</th><th>Date</th></tr></thead><tbody>
           {shown.map(g=><tr key={g.id}><td>{g.guest_name}</td><td><span className={g.confirmed?'admin-status yes':'admin-status no'}>{g.confirmed?'Présent(e)':'Absent(e)'}</span></td><td>{g.person_count}</td><td>{new Date(g.created_at).toLocaleDateString('fr-FR')}</td></tr>)}
           {!shown.length&&<tr><td colSpan={4} className="admin-empty">{loading?'Chargement…':'Aucune réponse pour ce filtre.'}</td></tr>}</tbody></table></div>
         <p className="admin-muted admin-export-note"><Download size={14}/> Le CSV est encodé pour s’ouvrir dans Excel.</p></div>}

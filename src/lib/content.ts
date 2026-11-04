@@ -41,7 +41,7 @@ export const initialContent: Content = {
   eventTime: '14:00',
   venue: 'Cocody Angré Mahou',
   venueDetail: 'Près de Laser Park',
-  mapUrl: 'https://www.google.com/maps/search/?api=1&query=Laser+Park+Cocody+Angre+Mahou',
+  mapUrl: 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48',
   groomName: 'Anougbre Brou Frédéric',
   brideName: 'Dukoua You Vanessa',
   familyNames: 'Anougbre et Dukoua',
