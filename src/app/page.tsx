@@ -86,6 +86,7 @@ export default function Home() {
 
   const days = Math.ceil(remaining / DAY_IN_MS);
   const stamp = updated || 'Mise à jour non renseignée';
+  const venueMapUrl = 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48';
 
   async function submitRsvp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -302,7 +303,7 @@ export default function Home() {
                     <div className="eyebrow">Votre accès à la réception</div>
                     <h3>Merci d’avoir confirmé votre présence !</h3>
                     <p>Voici les indications pour rejoindre facilement le lieu de la cérémonie.</p>
-                    <a href={content.mapUrl} target="_blank" rel="noreferrer" className="button" style={{ marginTop: 12 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
+                    <a href={venueMapUrl} target="_blank" rel="noreferrer" className="button" style={{ marginTop: 12 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
                   </div>
                   <div className="card" style={{ marginTop: 16 }}>
                     <div className="eyebrow">En transport en commun</div>
