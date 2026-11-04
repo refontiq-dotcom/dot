@@ -101,7 +101,7 @@ export default function Home() {
 
   async function share() {
     const shareData = {
-      title: 'La dot d’${content.groomName} & ${content.brideName}',
+      title: `La dot d’${content.groomName} & ${content.brideName}`,
       text: `Retrouvons-nous le ${formattedEventDate} à ${formattedEventTime} à ${content.venue}, ${content.venueDetail}.`,
       url: window.location.href,
     };
