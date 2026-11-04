@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   Phone,
   MessageCircle,
+  Lock,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 
@@ -89,7 +90,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    const sections = ['accueil', 'details', 'annonces', 'lieu', 'rsvp', 'faq']
+    const sections = ['accueil', 'annonces', 'lieu', 'rsvp', 'faq']
       .map(id => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) return;
@@ -208,7 +209,6 @@ export default function Home() {
         <div className="shell nav">
           <a href="#accueil" className="brand">F <span style={{ color: 'var(--accent)' }}>×</span> V</a>
           <nav className="navlinks" aria-label="Navigation principale">
-            <a href="#details">La cérémonie</a>
             {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
             <a href="#programme">Programme</a>
             <a href="#lieu">Le lieu</a>
@@ -252,21 +252,6 @@ export default function Home() {
                 <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
                 <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="details">
-          <div className="shell">
-            <div className="section-head">
-              <div className="eyebrow">Tout en un seul endroit</div>
-              <h2>Les repères de la journée</h2>
-              <p>Retrouvez ici les informations utiles, faciles à consulter et à partager avec vos proches.</p>
-            </div>
-            <div className="grid3">
-              <article className="card"><div className="iconbox"><CalendarCheck /></div><h3>Quand ?</h3><p>{formattedEventDate}<br />À partir de {formattedEventTime}</p></article>
-              <article className="card"><div className="iconbox"><MapPin /></div><h3>Où ?</h3><p>{content.venue}<br />{content.venueDetail}</p></article>
-              <article className="card"><div className="iconbox"><Heart /></div><h3>Avec qui ?</h3><p>Les familles {content.familyNames}</p></article>
             </div>
           </div>
         </section>
@@ -474,15 +459,14 @@ export default function Home() {
       </main>
 
       <footer className="footer">
-        <div className="shell" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div className="shell footer-inner">
           <span>Avec affection, les familles {content.familyNames} · {eventDate.getUTCFullYear()}</span>
-          <a href="/admin">Accès organisateurs</a>
+          <a className="organizer-access" href="/admin"><Lock size={16} /> Accès organisateurs</a>
         </div>
       </footer>
 
       <nav className="mobile-nav" aria-label="Navigation rapide">
         <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
-        <a href="#details" aria-current={activeSection === 'details' ? 'location' : undefined}><Calendar /><span>Infos</span></a>
         <a href="#lieu" aria-current={activeSection === 'lieu' ? 'location' : undefined}><MapPin /><span>Lieu</span></a>
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
