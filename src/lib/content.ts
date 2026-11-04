@@ -1,5 +1,8 @@
 export type Item = { id: string; title: string; detail: string; confirmed: boolean };
+export type PagneContact = { id: string; label: string; phone: string };
+export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type Content = {
+  pagne: PagneContent;
   announcement: string;
   items: Item[];
   faq: Item[];
@@ -15,6 +18,13 @@ export type Content = {
 };
 
 export const initialContent: Content = {
+  pagne: {
+    enabled: true,
+    price: 2500,
+    description: 'Le pagne de la dot est disponible auprès des vendeurs indiqués. Contactez directement le vendeur de votre choix pour commander.',
+    imageUrl: '',
+    contacts: [],
+  },
   announcement: 'Bienvenue sur votre espace famille. Les prochaines informations seront partagées ici.',
   items: [
     { id: 'arrival', title: 'Accueil des familles', detail: 'Horaire à confirmer par les familles.', confirmed: false },
