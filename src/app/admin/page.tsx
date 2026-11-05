@@ -4,9 +4,13 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { ArrowLeft, LogOut, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
+import { declaredGroupSize, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
-type RSVP = { id: string; guest_name: string; person_count: number; confirmed: boolean; created_at: string };
+type Companion = { id: string; full_name: string; position: number };
+type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
+type GuestFilter = 'all' | 'yes' | 'no' | 'principals' | 'companions' | 'duplicates';
+type PersonRow = { key: string; rsvpId: string; name: string; kind: 'principal' | 'companion'; phone: string | null; principal: string; groupSize: number; confirmed: boolean; createdAt: string; updatedAt: string | null; duplicate: boolean };
 type Tab = 'overview' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
@@ -14,7 +18,7 @@ export default function AdminPage() {
   const [loginError,setLoginError]=useState(''),[busy,setBusy]=useState(false),[content,setContent]=useState<Content>(initialContent);
   const [guests,setGuests]=useState<RSVP[]>([]),[tab,setTab]=useState<Tab>('overview'),[notice,setNotice]=useState('');
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
-  const [filter,setFilter]=useState<'all'|'yes'|'no'>('all');
+  const [filter,setFilter]=useState<GuestFilter>('all');
   const [uploadingPagne,setUploadingPagne]=useState(false);
 
   const checkSession=useCallback(async()=>{
@@ -24,7 +28,7 @@ export default function AdminPage() {
   },[]);
   const refresh=useCallback(async()=>{
     setLoading(true);setNotice('');
-    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,person_count,confirmed,created_at').order('created_at',{ascending:false})]);
+    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false})]);
       if(r.error)throw r.error;setContent(c);setGuests((r.data??[]) as RSVP[]);
     } catch(e){setNotice(e instanceof Error?e.message:'Chargement impossible.');} finally{setLoading(false);}
   },[]);
@@ -70,9 +74,31 @@ export default function AdminPage() {
     field('pagne',{...content.pagne,contacts:content.pagne.contacts.map((item,i)=>i===index?{...item,...patch}:item)});
   }
   function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
-  const shown=useMemo(()=>guests.filter(g=>g.guest_name.toLowerCase().includes(search.trim().toLowerCase())&&(filter==='all'||(filter==='yes'&&g.confirmed)||(filter==='no'&&!g.confirmed))),[guests,search,filter]);
-  const yes=guests.filter(g=>g.confirmed).length,no=guests.length-yes,total=guests.reduce((s,g)=>s+(g.confirmed?g.person_count:0),0);
-  function exportCsv(){const rows=[['Nom','Réponse','Nombre de personnes','Date'],...shown.map(g=>[g.guest_name,g.confirmed?'Présent(e)':'Absent(e)',String(g.person_count),new Date(g.created_at).toLocaleString('fr-FR')])];
+  const summary=useMemo(()=>summarizeGuests(guests),[guests]);
+  const people=useMemo<PersonRow[]>(()=>{
+    const rows:PersonRow[]=[];
+    for(const g of guests){
+      const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position);
+      const size=declaredGroupSize(g.person_count,companions.length,g.confirmed);
+      rows.push({key:`p:${g.id}`,rsvpId:g.id,name:g.guest_name,kind:'principal',phone:g.phone,principal:g.guest_name,groupSize:size,confirmed:g.confirmed,createdAt:g.created_at,updatedAt:g.updated_at,duplicate:false});
+      for(const c of companions) rows.push({key:`c:${c.id}`,rsvpId:g.id,name:c.full_name,kind:'companion',phone:null,principal:g.guest_name,groupSize:size,confirmed:g.confirmed,createdAt:g.created_at,updatedAt:g.updated_at,duplicate:false});
+    }
+    // Un nom identique dans deux groupes distincts est signalé, jamais fusionné.
+    const groups=new Map<string,Set<string>>();
+    for(const row of rows){const key=normalizeNameKey(row.name);if(!key)continue;const ids=groups.get(key)??new Set<string>();ids.add(row.rsvpId);groups.set(key,ids);}
+    return rows.map(row=>{const key=normalizeNameKey(row.name);const ids=groups.get(key);return {...row,duplicate:Boolean(ids&&ids.size>1)};});
+  },[guests]);
+  const searchTerm=search.trim().toLowerCase();
+  const shown=useMemo(()=>people.filter(p=>{
+    if(searchTerm&&!p.name.toLowerCase().includes(searchTerm)&&!p.principal.toLowerCase().includes(searchTerm))return false;
+    if(filter==='yes')return p.confirmed;
+    if(filter==='no')return !p.confirmed;
+    if(filter==='principals')return p.kind==='principal';
+    if(filter==='companions')return p.kind==='companion';
+    if(filter==='duplicates')return p.duplicate;
+    return true;
+  }),[people,searchTerm,filter]);
+  function exportCsv(){const rows=[['Nom','Type','Téléphone','Invité principal','Groupe','Réponse','Créé le','Modifié le'],...shown.map(p=>[p.name,p.kind==='principal'?'Invité principal':'Accompagnateur',p.phone??'',p.kind==='companion'?p.principal:'',p.confirmed?`${p.groupSize} personne(s)`:'',p.confirmed?'Présent(e)':'Absent(e)',new Date(p.createdAt).toLocaleString('fr-FR'),p.updatedAt?new Date(p.updatedAt).toLocaleString('fr-FR'):''])];
     const csv='\uFEFF'+rows.map(row=>row.map(x=>{const safe=/^[=+\-@]/.test(x)?`'${x}`:x;return '"'+safe.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download='liste-invites-dot.csv';a.click();URL.revokeObjectURL(url);
   }
@@ -102,10 +128,10 @@ export default function AdminPage() {
       <div className="admin-section-head"><div><div className="eyebrow">Espace organisateurs</div><h2>{tabs.find(t=>t.id===tab)?.label}</h2></div><button className="button secondary small" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/> Actualiser</button></div>
       {notice&&<div className="admin-success" role="status">{notice}</div>}
       {tab==='overview'&&<><div className="admin-stat-grid">
-        <article className="admin-stat"><span>Réponses reçues</span><strong>{guests.length}</strong><small>Tous les invités ayant répondu</small></article>
-        <article className="admin-stat"><span>Présences confirmées</span><strong>{yes}</strong><small><UserCheck size={14}/> réponses positives</small></article>
-        <article className="admin-stat"><span>Personnes attendues</span><strong>{total}</strong><small>Répondants compris</small></article>
-        <article className="admin-stat"><span>Indisponibilités</span><strong>{no}</strong><small><UserX size={14}/> réponses négatives</small></article></div>
+        <article className="admin-stat"><span>Réponses reçues</span><strong>{summary.responses}</strong><small>Invités principaux ayant répondu</small></article>
+        <article className="admin-stat"><span>Présences confirmées</span><strong>{summary.attending}</strong><small><UserCheck size={14}/> réponses positives</small></article>
+        <article className="admin-stat"><span>Personnes attendues</span><strong>{summary.expectedPeople}</strong><small>{summary.attending} principal{summary.attending > 1 ? 'aux' : ''} + {summary.companions} accompagnateur{summary.companions > 1 ? 's' : ''}</small></article>
+        <article className="admin-stat"><span>Indisponibilités</span><strong>{summary.declined}</strong><small><UserX size={14}/> réponses négatives</small></article></div>
         <div className="admin-panel"><h3>Raccourcis</h3><div className="admin-shortcuts"><button onClick={()=>setTab('event')}><MapPin/> Modifier lieu et itinéraire</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('guests')}><Users/> Voir les invités</button><button onClick={()=>setTab('pagne')}><ImagePlus/> Ajouter la photo du pagne</button></div></div>
         <div className="admin-panel"><h3>Informations actuelles</h3><p><b>Date :</b> {content.eventDate} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p><p><b>Étapes :</b> {content.items.length} · <b>Questions :</b> {content.faq.length}</p></div></>}
 
@@ -157,11 +183,12 @@ export default function AdminPage() {
       </div>}
 
       {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Réponses des invités</h3><p className="admin-muted">Liste privée accessible uniquement aux organisateurs.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Exporter CSV / Excel</button></div>
-        <div className="admin-guest-tools"><div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un nom…"/></div><select value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}><option value="all">Toutes les réponses</option><option value="yes">Présences confirmées</option><option value="no">Absences</option></select></div>
-        <div className="admin-guest-summary">{shown.length} {shown.length > 1 ? 'réponses affichées' : 'réponse affichée'} · {total} {total > 1 ? 'personnes attendues' : 'personne attendue'}</div><div className="admin-table-wrap"><table className="admin-guest-table"><thead><tr><th>Nom</th><th>Réponse</th><th>Personnes</th><th>Date</th></tr></thead><tbody>
-          {shown.map(g=><tr key={g.id}><td>{g.guest_name}</td><td><span className={g.confirmed?'admin-status yes':'admin-status no'}>{g.confirmed?'Présent(e)':'Absent(e)'}</span></td><td>{g.person_count}</td><td>{new Date(g.created_at).toLocaleDateString('fr-FR')}</td></tr>)}
-          {!shown.length&&<tr><td colSpan={4} className="admin-empty">{loading?'Chargement…':'Aucune réponse pour ce filtre.'}</td></tr>}</tbody></table></div>
-        <p className="admin-muted admin-export-note"><Download size={14}/> Le CSV est encodé pour s’ouvrir dans Excel.</p></div>}
+        <div className="admin-guest-tools"><div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un nom…"/></div><select value={filter} onChange={e=>setFilter(e.target.value as GuestFilter)}>
+          <option value="all">Toutes les personnes</option><option value="principals">Invités principaux</option><option value="companions">Accompagnateurs</option><option value="yes">Présences confirmées</option><option value="no">Absences</option><option value="duplicates">Doublons potentiels</option></select></div>
+        <div className="admin-guest-summary">{shown.length} {shown.length > 1 ? 'personnes affichées' : 'personne affichée'} · {summary.expectedPeople} {summary.expectedPeople > 1 ? 'personnes attendues' : 'personne attendue'} · {summary.companions} accompagnateur{summary.companions > 1 ? 's' : ''}</div><div className="admin-table-wrap"><table className="admin-guest-table"><thead><tr><th>Nom</th><th>Type</th><th>Téléphone</th><th>Invité principal</th><th>Groupe</th><th>Réponse</th><th>Créé le</th><th>Modifié le</th></tr></thead><tbody>
+          {shown.map(p=><tr key={p.key}><td>{p.name}{p.duplicate&&<span className="admin-duplicate" title="Un nom identique apparaît dans un autre groupe">Doublon possible</span>}</td><td>{p.kind==='principal'?'Invité principal':'Accompagnateur'}</td><td>{p.phone?<a href={`tel:${p.phone.replace(/[^+\d]/g,'')}`}>{p.phone}</a>:'—'}</td><td>{p.kind==='companion'?p.principal:'—'}</td><td>{p.confirmed?`${p.groupSize} pers.`:'—'}</td><td><span className={p.confirmed?'admin-status yes':'admin-status no'}>{p.confirmed?'Présent(e)':'Absent(e)'}</span></td><td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td><td>{p.updatedAt?new Date(p.updatedAt).toLocaleDateString('fr-FR'):'—'}</td></tr>)}
+          {!shown.length&&<tr><td colSpan={8} className="admin-empty">{loading?'Chargement…':'Aucune personne pour ce filtre.'}</td></tr>}</tbody></table></div>
+        <p className="admin-muted admin-export-note"><Download size={14}/> Les accompagnateurs n’ont pas de numéro propre : leur contact de référence est l’invité principal.</p></div>}
     </section></div><footer className="admin-dashboard-footer">Espace privé de l’organisation · <Link href="/">Retour à l’invitation</Link></footer>
   </div></main>;
 }

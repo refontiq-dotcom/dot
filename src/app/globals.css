@@ -169,3 +169,18 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .organizer-access{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 16px;border:1px solid #b9cddd;border-radius:9px;background:#fff;color:var(--deep);font-size:13.5px;font-weight:700;text-decoration:none;box-shadow:0 3px 10px rgba(11,47,115,.07);transition:border-color .15s ease,color .15s ease,box-shadow .15s ease}
 .organizer-access:hover,.organizer-access:focus-visible{border-color:var(--accent);color:var(--accent);box-shadow:0 4px 14px rgba(15,126,155,.16)}
 @media(max-width:760px){.footer-inner{align-items:stretch}.organizer-access{width:100%}}
+
+/* Identification des invités et accompagnateurs */
+.rsvp-hint{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}
+.rsvp-actions{display:flex;flex-wrap:wrap;gap:8px}
+.rsvp-actions .button{flex:1 1 160px}
+.rsvp-confirm{border:1px solid #e6c9c0;background:#fff5f1;border-radius:10px;padding:14px 16px;margin:0 0 18px}
+.rsvp-confirm p{margin:6px 0 10px;color:#7d4a3d;font-size:14px}
+.rsvp-summary{background:#eef4f9;border-radius:10px;padding:13px 15px;margin:0 0 18px}
+.rsvp-summary p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.rsvp-summary .rsvp-hint{margin:4px 0 0}
+.modal-note{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted)}
+.modal-note svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
+.admin-duplicate{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:99px;background:#fdf0e3;color:#8a5a1f;font-size:11px;font-weight:700}
+.admin-guest-table a{color:var(--deep);text-decoration:underline;text-underline-offset:2px}
+@media(max-width:760px){.rsvp-actions{display:grid}}

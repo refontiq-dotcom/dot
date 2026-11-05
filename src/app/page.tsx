@@ -19,8 +19,16 @@ import {
   Lock,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
+import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
-type RsvpReceipt = { guestName: string; attending: boolean; personCount: number };
+type RsvpReceipt = {
+  guestName: string;
+  attending: boolean;
+  companionCount: number;
+  personCount: number;
+  updated: boolean;
+  possibleDuplicate: boolean;
+};
 
 function Calendar() {
   return <CalendarDays size={19} />;
@@ -30,8 +38,10 @@ export default function Home() {
   const [content, setContent] = useState<Content>(initialContent);
   const [updated, setUpdated] = useState<string>('');
   const [guestName, setGuestName] = useState('');
+  const [phone, setPhone] = useState('');
   const [attending, setAttending] = useState('yes');
-  const [personCount, setPersonCount] = useState('1');
+  const [companions, setCompanions] = useState<string[]>([]);
+  const [pendingRemoval, setPendingRemoval] = useState<{ names: string[]; nextCount: number } | null>(null);
   const [rsvpStatus, setRsvpStatus] = useState('');
   const [rsvpReceipt, setRsvpReceipt] = useState<RsvpReceipt | null>(null);
   const [website, setWebsite] = useState('');
@@ -167,20 +177,112 @@ export default function Home() {
     }
   })();
 
+  const companionNames = companions.map(name => name.trim()).filter(Boolean);
+  const totalPeople = attending === 'yes' ? 1 + companions.length : 0;
+
+  function resetRsvpForm() {
+    setGuestName('');
+    setPhone('');
+    setAttending('yes');
+    setCompanions([]);
+    setPendingRemoval(null);
+    setWebsite('');
+    setRsvpStatus('');
+  }
+
+  function changeCompanionCount(nextCount: number) {
+    setRsvpStatus('');
+    if (nextCount === companions.length) return;
+    if (nextCount > companions.length) {
+      setCompanions(previous => [...previous, ...Array.from({ length: nextCount - previous.length }, () => '')]);
+      return;
+    }
+    const removed = removedCompanions(companions, nextCount);
+    if (removed.length > 0) {
+      setPendingRemoval({ names: removed, nextCount });
+      return;
+    }
+    setCompanions(previous => previous.slice(0, nextCount));
+  }
+
   async function submitRsvp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setRsvpBusy(true);
     setRsvpStatus('');
+
+    const parsed = normalizeIvorianPhone(phone);
+    if (!parsed.ok) {
+      setRsvpStatus(parsed.error);
+      return;
+    }
+
+    const attendingYes = attending === 'yes';
+    if (attendingYes) {
+      const missing = companions
+        .map((name, index) => (name.trim() ? -1 : index))
+        .filter(index => index >= 0);
+      if (missing.length > 0) {
+        const positions = missing.map(index => index + 1);
+        const list = positions.length === 1
+          ? String(positions[0])
+          : `${positions.slice(0, -1).join(', ')} et ${positions[positions.length - 1]}`;
+        setRsvpStatus(positions.length === 1
+          ? `Renseignez le nom de l’accompagnateur ${list} pour envoyer votre réponse.`
+          : `Renseignez le nom des accompagnateurs ${list} pour envoyer votre réponse.`);
+        const firstEmpty = document.getElementById(`companion-${missing[0]}`);
+        firstEmpty?.focus({ preventScroll: true });
+        firstEmpty?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const seenNames = new Map<string, number>();
+      const guestKey = normalizeNameKey(guestName);
+      if (guestKey) seenNames.set(guestKey, -1);
+      for (let index = 0; index < companions.length; index += 1) {
+        const key = normalizeNameKey(companions[index]);
+        if (!key) continue;
+        const previous = seenNames.get(key);
+        if (previous !== undefined) {
+          const duplicateLabel = companions[index].trim() || `l’accompagnateur ${index + 1}`;
+          setRsvpStatus(previous === -1
+            ? `« ${duplicateLabel} » est déjà indiqué comme invité principal. Utilisez un nom différent pour l’accompagnateur ${index + 1}.`
+            : `Le nom de l’accompagnateur ${previous + 1} est indiqué deux fois. Renseignez un nom différent pour l’accompagnateur ${index + 1}.`);
+          const duplicateField = document.getElementById(`companion-${index}`);
+          duplicateField?.focus({ preventScroll: true });
+          duplicateField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        seenNames.set(key, index);
+      }
+    }
+
+    setRsvpBusy(true);
     try {
       const response = await fetch('/api/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0, website }),
+        body: JSON.stringify({
+          guestName,
+          phone: parsed.normalized,
+          attending: attendingYes,
+          companions: attendingYes ? companionNames : [],
+          website,
+        }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Enregistrement impossible.');
-      setRsvpReceipt({ guestName, attending: attending === 'yes', personCount: attending === 'yes' ? Number(personCount) : 0 });
-      const travelGuideUnlocked = attending === 'yes';
+      if (!response.ok) {
+        throw new Error(result.error || 'Enregistrement impossible.');
+      }
+
+      setRsvpReceipt({
+        guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
+        attending: typeof result.attending === 'boolean' ? result.attending : attendingYes,
+        companionCount: typeof result.companionCount === 'number' ? result.companionCount : 0,
+        personCount: typeof result.personCount === 'number' ? result.personCount : 1,
+        updated: Boolean(result.updated),
+        possibleDuplicate: Boolean(result.possibleDuplicate),
+      });
+
+      const travelGuideUnlocked = attendingYes;
       setShowTravelGuide(travelGuideUnlocked);
       try {
         if (travelGuideUnlocked) {
@@ -191,10 +293,7 @@ export default function Home() {
       } catch {
         // Le guide reste accessible dans la session courante même si le stockage est indisponible.
       }
-      setGuestName('');
-      setAttending('yes');
-      setPersonCount('1');
-      setWebsite('');
+      resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
     } finally {
@@ -400,32 +499,89 @@ export default function Home() {
             <form className="rsvp-form" onSubmit={submitRsvp}>
               <label htmlFor="guest-name">Votre nom et prénom</label>
               <input id="guest-name" name="guestName" autoComplete="name" maxLength={120} required value={guestName} onChange={event => setGuestName(event.target.value)} placeholder="Ex. : Marie Kouassi" />
+
+              <label htmlFor="guest-phone">Votre numéro de téléphone</label>
+              <input
+                id="guest-phone"
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength={24}
+                required
+                value={phone}
+                onChange={event => setPhone(event.target.value)}
+                placeholder="Ex. : 07 00 00 00 00"
+              />
               <fieldset>
                 <legend>Serez-vous présent(e) ?</legend>
                 <label className="rsvp-choice">
-                  <input type="radio" name="attending" value="yes" checked={attending === 'yes'} onChange={() => setAttending('yes')} />
+                  <input type="radio" name="attending" value="yes" checked={attending === 'yes'} onChange={() => { setAttending('yes'); setRsvpStatus(''); }} />
                   Oui, je serai présent(e)
                 </label>
                 <label className="rsvp-choice">
-                  <input type="radio" name="attending" value="no" checked={attending === 'no'} onChange={() => setAttending('no')} />
+                  <input type="radio" name="attending" value="no" checked={attending === 'no'} onChange={() => { setAttending('no'); setRsvpStatus(''); }} />
                   Non, je ne pourrai pas venir
                 </label>
               </fieldset>
+
               {attending === 'yes' && (
                 <div>
-                  <label htmlFor="person-count">Nombre total de personnes (vous compris)</label>
-                  <select id="person-count" value={personCount} onChange={event => setPersonCount(event.target.value)}>
-                    {Array.from({ length: 10 }, (_, index) => String(index + 1)).map(value => <option key={value} value={value}>{value}</option>)}
+                  <label htmlFor="companion-count">Nombre d’accompagnateurs</label>
+                  <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
+                    {Array.from({ length: 10 }, (_, index) => index).map(count => (
+                      <option key={count} value={count}>
+                        {count === 0 ? 'Aucun, je viens seul(e)' : `${count} accompagnateur${count > 1 ? 's' : ''}`}
+                      </option>
+                    ))}
                   </select>
+                  {companions.map((companion, index) => (
+                    <div key={index}>
+                      <label htmlFor={`companion-${index}`}>Accompagnateur {index + 1}</label>
+                      <input
+                        id={`companion-${index}`}
+                        maxLength={120}
+                        value={companion}
+                        onChange={event => { setRsvpStatus(''); setCompanions(previous => previous.map((name, position) => position === index ? event.target.value : name)); }}
+                        placeholder="Nom et prénom"
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
+
+              {pendingRemoval && (
+                <div className="rsvp-confirm" role="alert">
+                  <b>Retirer {pendingRemoval.names.length > 1 ? 'ces accompagnateurs' : 'cet accompagnateur'} ?</b>
+                  <p>{pendingRemoval.names.join(', ')} {pendingRemoval.names.length > 1 ? 'ne seront plus comptés' : 'ne sera plus compté(e)'} dans votre groupe.</p>
+                  <div className="rsvp-actions">
+                    <button type="button" className="button small" onClick={() => { setCompanions(previous => previous.slice(0, pendingRemoval.nextCount)); setPendingRemoval(null); }}>Oui, retirer</button>
+                    <button type="button" className="button secondary small" onClick={() => setPendingRemoval(null)}>Conserver</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="rsvp-summary" aria-live="polite">
+                <b>Récapitulatif</b>
+                {attending === 'yes' ? (
+                  <>
+                    <p>{companions.length > 0 ? `Vous serez présent(e) avec ${companions.length} accompagnateur${companions.length > 1 ? 's' : ''}, soit ${totalPeople} personnes au total.` : 'Vous serez présent(e), seul(e).'}</p>
+                    {companionNames.length > 0 && <p className="rsvp-hint">{companionNames.join(' · ')}</p>}
+                  </>
+                ) : (
+                  <p>Vous serez absent(e). Aucune place ne sera réservée.</p>
+                )}
+              </div>
+
               <div className="rsvp-trap" aria-hidden="true">
                 <label htmlFor="rsvp-website">Ne pas remplir ce champ</label>
                 <input id="rsvp-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
               </div>
-              <button className="button" type="submit" disabled={rsvpBusy}>{rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}</button>
+              <button className="button" type="submit" disabled={rsvpBusy}>
+                {rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}
+              </button>
               {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
-              <p className="rsvp-privacy">Votre réponse est réservée à l’organisation de la cérémonie et n’est pas affichée publiquement.</p>
+              <p className="rsvp-privacy">Votre numéro et votre réponse restent privés.</p>
             </form>
           </div>
         </section>
@@ -481,20 +637,24 @@ export default function Home() {
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
               {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été mise à jour' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
             {rsvpReceipt.attending ? (
               <>
                 <p id="rsvp-modal-text">
-                  Nous sommes heureux de vous compter parmi nous.{' '}
-                  {rsvpReceipt.personCount > 1
-                    ? `Vos ${rsvpReceipt.personCount} places sont réservées.`
+                  {rsvpReceipt.updated ? 'Votre réponse a bien été mise à jour.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
+                  {rsvpReceipt.companionCount > 0
+                    ? `Vos ${rsvpReceipt.personCount} places sont réservées (vous et ${rsvpReceipt.companionCount} accompagnateur${rsvpReceipt.companionCount > 1 ? 's' : ''}).`
                     : 'Votre place est réservée.'}
                 </p>
                 <div className="modal-event">
                   <CalendarCheck size={18} />
                   <span>{formattedEventDate} · {formattedEventTime}<br />{content.venue}, {content.venueDetail}</span>
                 </div>
+                {rsvpReceipt.possibleDuplicate && (
+                  <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>
+                )}
+                <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">
                   <button
                     type="button"
@@ -512,8 +672,12 @@ export default function Home() {
             ) : (
               <>
                 <p id="rsvp-modal-text">
-                  Votre réponse a bien été transmise aux familles. Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
+                  {rsvpReceipt.updated ? 'Votre réponse a bien été mise à jour.' : 'Votre réponse a bien été transmise aux familles.'} Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
                 </p>
+                {rsvpReceipt.possibleDuplicate && (
+                  <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>
+                )}
+                <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">
                   <button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button>
                 </div>
