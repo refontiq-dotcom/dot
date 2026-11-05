@@ -90,17 +90,17 @@ export function cleanCompanionNames(input: unknown, attending: boolean): Compani
   if (!attending) {
     const length = Array.isArray(input) ? input.filter(item => cleanPersonName(item)).length : 0;
     if (length > 0) {
-      return { ok: false, error: 'Aucun accompagnateur ne peut être enregistré pour une absence.' };
+      return { ok: false, error: 'Aucun proche ne peut être indiqué pour une absence.' };
     }
     return { ok: true, names: [], keys: [] };
   }
 
   if (input === undefined || input === null) return { ok: true, names: [], keys: [] };
   if (!Array.isArray(input)) {
-    return { ok: false, error: 'La liste des accompagnateurs est invalide.' };
+    return { ok: false, error: 'La liste des proches est invalide.' };
   }
   if (input.length > MAX_COMPANIONS) {
-    return { ok: false, error: `Vous pouvez ajouter au maximum ${MAX_COMPANIONS} accompagnateurs.` };
+    return { ok: false, error: `Vous pouvez ajouter au maximum ${MAX_COMPANIONS} proches.` };
   }
 
   const names: string[] = [];
@@ -110,14 +110,14 @@ export function cleanCompanionNames(input: unknown, attending: boolean): Compani
   for (const item of input) {
     const name = cleanPersonName(item);
     if (name.length < 2 || name.length > 120) {
-      return { ok: false, error: 'Chaque accompagnateur doit avoir un nom et prénom (2 à 120 caractères).' };
+      return { ok: false, error: 'Chaque proche doit avoir un nom et prénom (2 à 120 caractères).' };
     }
     const key = normalizeNameKey(name);
     if (!key) {
-      return { ok: false, error: 'Le nom d’un accompagnateur est invalide.' };
+      return { ok: false, error: 'Le nom d’un proche est invalide.' };
     }
     if (seen.has(key)) {
-      return { ok: false, error: 'Le même accompagnateur est renseigné deux fois.' };
+      return { ok: false, error: 'Le même proche est indiqué deux fois.' };
     }
     seen.add(key);
     names.push(name);

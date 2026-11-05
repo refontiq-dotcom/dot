@@ -226,8 +226,8 @@ export default function Home() {
           ? String(positions[0])
           : `${positions.slice(0, -1).join(', ')} et ${positions[positions.length - 1]}`;
         setRsvpStatus(positions.length === 1
-          ? `Renseignez le nom de l’accompagnateur ${list} pour envoyer votre réponse.`
-          : `Renseignez le nom des accompagnateurs ${list} pour envoyer votre réponse.`);
+          ? `Indiquez le nom de votre proche n°${list} pour envoyer votre réponse.`
+          : `Indiquez le nom de vos proches n°${list} pour envoyer votre réponse.`);
         const firstEmpty = document.getElementById(`companion-${missing[0]}`);
         firstEmpty?.focus({ preventScroll: true });
         firstEmpty?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -242,10 +242,10 @@ export default function Home() {
         if (!key) continue;
         const previous = seenNames.get(key);
         if (previous !== undefined) {
-          const duplicateLabel = companions[index].trim() || `l’accompagnateur ${index + 1}`;
+          const duplicateLabel = companions[index].trim() || `votre proche n°${index + 1}`;
           setRsvpStatus(previous === -1
-            ? `« ${duplicateLabel} » est déjà indiqué comme invité principal. Utilisez un nom différent pour l’accompagnateur ${index + 1}.`
-            : `Le nom de l’accompagnateur ${previous + 1} est indiqué deux fois. Renseignez un nom différent pour l’accompagnateur ${index + 1}.`);
+            ? `« ${duplicateLabel} » est déjà votre propre nom. Indiquez le nom de votre proche n°${index + 1}.`
+            : `Les proches n°${previous + 1} et n°${index + 1} ont le même nom. Indiquez un nom différent pour le proche n°${index + 1}.`);
           const duplicateField = document.getElementById(`companion-${index}`);
           duplicateField?.focus({ preventScroll: true });
           duplicateField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -527,17 +527,18 @@ export default function Home() {
 
               {attending === 'yes' && (
                 <div>
-                  <label htmlFor="companion-count">Nombre d’accompagnateurs</label>
+                  <label htmlFor="companion-count">Qui vient avec vous ?</label>
+                  <p className="rsvp-hint">Famille, conjoint(e), enfants : vous êtes les bienvenus. Dites-nous simplement combien vous serez.</p>
                   <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
                     {Array.from({ length: 10 }, (_, index) => index).map(count => (
                       <option key={count} value={count}>
-                        {count === 0 ? 'Aucun, je viens seul(e)' : `${count} accompagnateur${count > 1 ? 's' : ''}`}
+                        {count === 0 ? 'Je viens seul(e)' : `${count} proche${count > 1 ? 's' : ''} avec moi`}
                       </option>
                     ))}
                   </select>
                   {companions.map((companion, index) => (
                     <div key={index}>
-                      <label htmlFor={`companion-${index}`}>Accompagnateur {index + 1}</label>
+                      <label htmlFor={`companion-${index}`}>Nom de votre proche n°{index + 1}</label>
                       <input
                         id={`companion-${index}`}
                         maxLength={120}
@@ -552,7 +553,7 @@ export default function Home() {
 
               {pendingRemoval && (
                 <div className="rsvp-confirm" role="alert">
-                  <b>Retirer {pendingRemoval.names.length > 1 ? 'ces accompagnateurs' : 'cet accompagnateur'} ?</b>
+                  <b>Retirer {pendingRemoval.names.length > 1 ? 'ces proches' : 'ce proche'} ?</b>
                   <p>{pendingRemoval.names.join(', ')} {pendingRemoval.names.length > 1 ? 'ne seront plus comptés' : 'ne sera plus compté(e)'} dans votre groupe.</p>
                   <div className="rsvp-actions">
                     <button type="button" className="button small" onClick={() => { setCompanions(previous => previous.slice(0, pendingRemoval.nextCount)); setPendingRemoval(null); }}>Oui, retirer</button>
@@ -565,7 +566,7 @@ export default function Home() {
                 <b>Récapitulatif</b>
                 {attending === 'yes' ? (
                   <>
-                    <p>{companions.length > 0 ? `Vous serez présent(e) avec ${companions.length} accompagnateur${companions.length > 1 ? 's' : ''}, soit ${totalPeople} personnes au total.` : 'Vous serez présent(e), seul(e).'}</p>
+                    <p>{companions.length > 0 ? `Vous serez présent(e) avec ${companions.length} proche${companions.length > 1 ? 's' : ''}, soit ${totalPeople} personnes au total.` : 'Vous serez présent(e), seul(e).'}</p>
                     {companionNames.length > 0 && <p className="rsvp-hint">{companionNames.join(' · ')}</p>}
                   </>
                 ) : (
@@ -637,14 +638,14 @@ export default function Home() {
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
               {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été mise à jour' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.updated ? 'Vous êtes déjà sur la liste des invités' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
             {rsvpReceipt.attending ? (
               <>
                 <p id="rsvp-modal-text">
-                  {rsvpReceipt.updated ? 'Votre réponse a bien été mise à jour.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
+                  {rsvpReceipt.updated ? 'Nous avons bien mis votre réponse à jour.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
                   {rsvpReceipt.companionCount > 0
-                    ? `Vos ${rsvpReceipt.personCount} places sont réservées (vous et ${rsvpReceipt.companionCount} accompagnateur${rsvpReceipt.companionCount > 1 ? 's' : ''}).`
+                    ? `Vos ${rsvpReceipt.personCount} places sont réservées (vous et ${rsvpReceipt.companionCount} proche${rsvpReceipt.companionCount > 1 ? 's' : ''}).`
                     : 'Votre place est réservée.'}
                 </p>
                 <div className="modal-event">
@@ -672,7 +673,7 @@ export default function Home() {
             ) : (
               <>
                 <p id="rsvp-modal-text">
-                  {rsvpReceipt.updated ? 'Votre réponse a bien été mise à jour.' : 'Votre réponse a bien été transmise aux familles.'} Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
+                  {rsvpReceipt.updated ? 'Nous avons bien mis votre réponse à jour.' : 'Votre réponse a bien été transmise aux familles.'} Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
                 </p>
                 {rsvpReceipt.possibleDuplicate && (
                   <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>

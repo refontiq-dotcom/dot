@@ -1,16 +1,18 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, LogOut, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
 import { declaredGroupSize, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
+const plain = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const phoneDigits = (phone: string) => { const d = phone.replace(/\D/g, ''); return d.length === 10 ? `225${d}` : d; };
 type Companion = { id: string; full_name: string; position: number };
 type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
-type GuestFilter = 'all' | 'yes' | 'no' | 'principals' | 'companions' | 'duplicates';
-type PersonRow = { key: string; rsvpId: string; name: string; kind: 'principal' | 'companion'; phone: string | null; principal: string; groupSize: number; confirmed: boolean; createdAt: string; updatedAt: string | null; duplicate: boolean };
+type GuestFilter = 'all' | 'yes' | 'no' | 'check';
+type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
 type Tab = 'overview' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
@@ -75,65 +77,87 @@ export default function AdminPage() {
   }
   function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
   const summary=useMemo(()=>summarizeGuests(guests),[guests]);
-  const people=useMemo<PersonRow[]>(()=>{
-    const rows:PersonRow[]=[];
-    for(const g of guests){
-      const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position);
+  const closeOnes=Math.max(summary.expectedPeople-summary.attending,0);
+  const groups=useMemo<GuestGroup[]>(()=>{
+    const list:GuestGroup[]=guests.map(g=>{
+      const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position).map(c=>c.full_name);
       const size=declaredGroupSize(g.person_count,companions.length,g.confirmed);
-      rows.push({key:`p:${g.id}`,rsvpId:g.id,name:g.guest_name,kind:'principal',phone:g.phone,principal:g.guest_name,groupSize:size,confirmed:g.confirmed,createdAt:g.created_at,updatedAt:g.updated_at,duplicate:false});
-      for(const c of companions) rows.push({key:`c:${c.id}`,rsvpId:g.id,name:c.full_name,kind:'companion',phone:null,principal:g.guest_name,groupSize:size,confirmed:g.confirmed,createdAt:g.created_at,updatedAt:g.updated_at,duplicate:false});
-    }
-    // Un nom identique dans deux groupes distincts est signalé, jamais fusionné.
-    const groups=new Map<string,Set<string>>();
-    for(const row of rows){const key=normalizeNameKey(row.name);if(!key)continue;const ids=groups.get(key)??new Set<string>();ids.add(row.rsvpId);groups.set(key,ids);}
-    return rows.map(row=>{const key=normalizeNameKey(row.name);const ids=groups.get(key);return {...row,duplicate:Boolean(ids&&ids.size>1)};});
+      return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:g.confirmed,size,companions,unnamed:g.confirmed?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
+    });
+    // Un nom présent dans deux réponses différentes est signalé, jamais fusionné.
+    const owners=new Map<string,Set<string>>();
+    for(const g of list)for(const n of [g.name,...g.companions]){const k=normalizeNameKey(n);if(!k)continue;const ids=owners.get(k)??new Set<string>();ids.add(g.id);owners.set(k,ids);}
+    return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(n=>{const ids=owners.get(normalizeNameKey(n));return Boolean(ids&&ids.size>1);})}));
   },[guests]);
-  const searchTerm=search.trim().toLowerCase();
-  const shown=useMemo(()=>people.filter(p=>{
-    if(searchTerm&&!p.name.toLowerCase().includes(searchTerm)&&!p.principal.toLowerCase().includes(searchTerm))return false;
-    if(filter==='yes')return p.confirmed;
-    if(filter==='no')return !p.confirmed;
-    if(filter==='principals')return p.kind==='principal';
-    if(filter==='companions')return p.kind==='companion';
-    if(filter==='duplicates')return p.duplicate;
+  const searchTerm=plain(search.trim());
+  const counts={all:groups.length,yes:groups.filter(g=>g.confirmed).length,no:groups.filter(g=>!g.confirmed).length,check:groups.filter(g=>g.duplicates.length>0).length};
+  const shown=useMemo(()=>groups.filter(g=>{
+    if(searchTerm&&![g.name,...g.companions].some(n=>plain(n).includes(searchTerm)))return false;
+    if(filter==='yes')return g.confirmed;
+    if(filter==='no')return !g.confirmed;
+    if(filter==='check')return g.duplicates.length>0;
     return true;
-  }),[people,searchTerm,filter]);
-  function exportCsv(){const rows=[['Nom','Type','Téléphone','Invité principal','Groupe','Réponse','Créé le','Modifié le'],...shown.map(p=>[p.name,p.kind==='principal'?'Invité principal':'Accompagnateur',p.phone??'',p.kind==='companion'?p.principal:'',p.confirmed?`${p.groupSize} personne(s)`:'',p.confirmed?'Présent(e)':'Absent(e)',new Date(p.createdAt).toLocaleString('fr-FR'),p.updatedAt?new Date(p.updatedAt).toLocaleString('fr-FR'):''])];
+  }),[groups,searchTerm,filter]);
+  function exportCsv(){
+    const day=(v:string)=>new Date(v).toLocaleDateString('fr-FR');
+    const rows=[['Nom','Invité ou proche','Venu(e) avec','Téléphone','Réponse','Personnes dans le groupe','Répondu le'],
+      ...shown.flatMap(g=>{
+        const answer=g.confirmed?'Présent(e)':'Absent(e)',size=g.confirmed?String(g.size):'0';
+        return [[g.name,'Invité','',g.phone??'',answer,size,day(g.createdAt)],
+          ...g.companions.map(n=>[n,'Proche',g.name,'',answer,size,day(g.createdAt)]),
+          ...(g.unnamed>0?[[`${g.unnamed} proche${g.unnamed>1?'s':''} (nom non donné)`,'Proche',g.name,'',answer,size,day(g.createdAt)]]:[])];
+      })];
     const csv='\uFEFF'+rows.map(row=>row.map(x=>{const safe=/^[=+\-@]/.test(x)?`'${x}`:x;return '"'+safe.replace(/"/g,'""')+'"';}).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download='liste-invites-dot.csv';a.click();URL.revokeObjectURL(url);
   }
   if(!ready)return <main className="admin-wrap"><div className="shell">Vérification de la session…</div></main>;
   if(!logged)return <main className="admin-wrap admin-login"><section className="admin-login-card">
     <div className="admin-login-mark"><LockKeyhole size={25}/></div><div className="eyebrow">Accès réservé à l’organisation</div><h1>Espace organisateurs</h1>
-    <p>L’adresse du compte est déjà renseignée. Saisissez le mot de passe communiqué par les organisateurs.</p>
+    <p>Entrez le mot de passe que les organisateurs vous ont donné.</p>
     <form onSubmit={login}><label htmlFor="admin-password">Mot de passe</label><input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Saisissez le mot de passe"/>
     {loginError&&<p className="admin-error" role="alert">{loginError}</p>}<button className="button admin-login-submit" disabled={busy}>{busy?'Connexion…':'Se connecter'}</button></form>
     <div className="admin-login-security"><ShieldCheck size={16}/> Connexion sécurisée · réponses confidentielles</div><Link href="/" className="admin-back-link"><ArrowLeft size={16}/> Retour à l’invitation</Link>
   </section></main>;
 
-  const tabs:{id:Tab;label:string;icon:ReactNode}[]=[
-    {id:'overview',label:'Vue d’ensemble',icon:<Users/>},{id:'event',label:'Date et lieu',icon:<MapPin/>},
-    {id:'program',label:'Programme',icon:<ListChecks/>},{id:'announcement',label:'Annonces',icon:<Megaphone/>},
-    {id:'faq',label:'Questions fréquentes',icon:<CircleHelp/>},{id:'guests',label:'Invités et réponses',icon:<UserCheck/>},
-    {id:'pagne',label:'Pagne de la dot',icon:<ShoppingBag/>},
+  const tabs:{id:Tab;label:string;help:string;icon:ReactNode}[]=[
+    {id:'overview',label:'Accueil',help:'Un résumé simple de vos invités et de ce qu’il reste à faire.',icon:<Home/>},
+    {id:'guests',label:'Liste des invités',help:'Qui vient, avec qui, et comment les joindre.',icon:<Users/>},
+    {id:'event',label:'Date et lieu',help:'La date, l’heure et le lieu affichés sur l’invitation.',icon:<MapPin/>},
+    {id:'program',label:'Programme',help:'Les étapes de la journée, telles que vos invités les voient.',icon:<ListChecks/>},
+    {id:'announcement',label:'Message aux invités',help:'Un message mis en avant en haut du site.',icon:<Megaphone/>},
+    {id:'faq',label:'Questions des invités',help:'Les réponses aux questions que se posent vos invités.',icon:<CircleHelp/>},
+    {id:'pagne',label:'Pagne de la dot',help:'La photo, le prix et les vendeurs du pagne.',icon:<ShoppingBag/>},
   ];
+  const plural=(n:number,one:string,many:string)=>`${n} ${n>1?many:one}`;
+  const pendingProgram=content.items.filter(i=>!i.confirmed).length,pendingFaq=content.faq.filter(i=>!i.confirmed).length;
+  const todos:{text:string;tab:Tab;filter?:GuestFilter;action:string}[]=[];
+  if(counts.check>0)todos.push({text:`${plural(counts.check,'réponse à vérifier','réponses à vérifier')} : un même nom apparaît deux fois.`,tab:'guests',filter:'check',action:'Voir'});
+  if(pendingProgram>0)todos.push({text:`${plural(pendingProgram,'étape du programme est','étapes du programme sont')} encore « à confirmer ».`,tab:'program',action:'Compléter'});
+  if(pendingFaq>0)todos.push({text:`${plural(pendingFaq,'réponse aux questions est','réponses aux questions sont')} encore « à confirmer ».`,tab:'faq',action:'Compléter'});
+  if(content.pagne.enabled&&!content.pagne.imageUrl)todos.push({text:'La photo du pagne n’a pas encore été ajoutée.',tab:'pagne',action:'Ajouter'});
+  const eventDay=(()=>{const d=new Date(`${content.eventDate}T12:00:00`);return Number.isNaN(d.getTime())?content.eventDate:d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();
+  const current=tabs.find(t=>t.id===tab);
   return <main className="admin-wrap"><div className="shell">
-    <header className="admin-dashboard-head"><div><div className="eyebrow">Deux héritages, une même union</div><h1>Administration</h1><p>Gestion de la cérémonie et suivi des invités</p></div>
-      <div className="row"><Link href="/" className="button secondary small"><ArrowLeft size={16}/> Voir le site</Link><button className="button secondary small" onClick={logout}><LogOut size={16}/> Déconnexion</button></div>
+    <header className="admin-dashboard-head"><div><div className="eyebrow">Deux héritages, une même union</div><h1>Espace organisateurs</h1><p>Suivez vos invités et modifiez le site, simplement.</p></div>
+      <div className="row"><Link href="/" className="button secondary small"><ArrowLeft size={16}/> Voir le site</Link><button className="button secondary small" onClick={logout}><LogOut size={16}/> Me déconnecter</button></div>
     </header>
-    <div className="admin-dashboard-grid"><aside className="admin-menu"><div className="admin-menu-label">GESTION DE LA CÉRÉMONIE</div>
+    <div className="admin-dashboard-grid"><aside className="admin-menu"><div className="admin-menu-label">MENU</div>
       {tabs.map(t=><button key={t.id} className={tab===t.id?'active':''} onClick={()=>setTab(t.id)}>{t.icon}<span>{t.label}</span></button>)}
       <div className="admin-menu-note">Connecté en tant que<br/><strong>{ADMIN_EMAIL}</strong></div>
     </aside><section className="admin-main">
-      <div className="admin-section-head"><div><div className="eyebrow">Espace organisateurs</div><h2>{tabs.find(t=>t.id===tab)?.label}</h2></div><button className="button secondary small" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/> Actualiser</button></div>
+      <div className="admin-section-head"><div><h2>{current?.label}</h2><p className="admin-tab-help">{current?.help}</p></div><button className="button secondary small" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/> {loading?'Mise à jour…':'Actualiser'}</button></div>
       {notice&&<div className="admin-success" role="status">{notice}</div>}
-      {tab==='overview'&&<><div className="admin-stat-grid">
-        <article className="admin-stat"><span>Réponses reçues</span><strong>{summary.responses}</strong><small>Invités principaux ayant répondu</small></article>
-        <article className="admin-stat"><span>Présences confirmées</span><strong>{summary.attending}</strong><small><UserCheck size={14}/> réponses positives</small></article>
-        <article className="admin-stat"><span>Personnes attendues</span><strong>{summary.expectedPeople}</strong><small>{summary.attending} principal{summary.attending > 1 ? 'aux' : ''} + {summary.companions} accompagnateur{summary.companions > 1 ? 's' : ''}</small></article>
-        <article className="admin-stat"><span>Indisponibilités</span><strong>{summary.declined}</strong><small><UserX size={14}/> réponses négatives</small></article></div>
-        <div className="admin-panel"><h3>Raccourcis</h3><div className="admin-shortcuts"><button onClick={()=>setTab('event')}><MapPin/> Modifier lieu et itinéraire</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('guests')}><Users/> Voir les invités</button><button onClick={()=>setTab('pagne')}><ImagePlus/> Ajouter la photo du pagne</button></div></div>
-        <div className="admin-panel"><h3>Informations actuelles</h3><p><b>Date :</b> {content.eventDate} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p><p><b>Étapes :</b> {content.items.length} · <b>Questions :</b> {content.faq.length}</p></div></>}
+      {tab==='overview'&&<>
+        <div className="admin-hero-stat"><span>Personnes attendues le jour J</span><strong>{summary.expectedPeople}</strong>
+          <p>{summary.responses===0?'Aucune réponse pour le moment. Elles apparaîtront ici dès que vos invités confirmeront.':`${plural(summary.attending,'invité','invités')} + ${plural(closeOnes,'proche venu avec eux','proches venus avec eux')}`}</p></div>
+        <div className="admin-stat-grid three">
+          <article className="admin-stat"><span>Invités présents</span><strong>{summary.attending}</strong><small><UserCheck size={14}/> ont dit oui</small></article>
+          <article className="admin-stat"><span>Proches avec eux</span><strong>{closeOnes}</strong><small><Users size={14}/> famille, amis</small></article>
+          <article className="admin-stat"><span>Ne viennent pas</span><strong>{summary.declined}</strong><small><UserX size={14}/> ont dit non</small></article></div>
+        <div className="admin-panel"><h3>Ce qu’il reste à faire</h3>
+          <ul className="admin-todo">{todos.length===0?<li className="ok"><span>Tout est à jour. Rien à faire pour le moment.</span></li>:todos.map(t=><li key={t.text}><span>{t.text}</span><button className="button secondary small" onClick={()=>{if(t.filter)setFilter(t.filter);setTab(t.tab);}}>{t.action}</button></li>)}</ul></div>
+        <div className="admin-panel"><h3>Accès rapide</h3><div className="admin-shortcuts"><button onClick={()=>{setFilter('all');setTab('guests');}}><Users/> Voir qui vient</button><button onClick={()=>setTab('announcement')}><Megaphone/> Écrire un message aux invités</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('event')}><MapPin/> Modifier la date ou le lieu</button></div></div>
+        <div className="admin-panel"><h3>Ce que vos invités voient</h3><p><b>Date :</b> {eventDay} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p></div></>}
 
       {tab==='event'&&<div className="admin-panel"><h3>Informations de la cérémonie</h3><p className="admin-muted">Ces informations seront publiées sur l’invitation après enregistrement.</p><div className="admin-form-grid">
         <div><label>Date</label><input type="date" value={content.eventDate} onChange={e=>field('eventDate',e.target.value)}/></div><div><label>Heure</label><input type="time" value={content.eventTime} onChange={e=>field('eventTime',e.target.value)}/></div>
@@ -182,13 +206,20 @@ export default function AdminPage() {
         <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer le pagne et les contacts'}</button>
       </div>}
 
-      {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Réponses des invités</h3><p className="admin-muted">Liste privée accessible uniquement aux organisateurs.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Exporter CSV / Excel</button></div>
-        <div className="admin-guest-tools"><div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un nom…"/></div><select value={filter} onChange={e=>setFilter(e.target.value as GuestFilter)}>
-          <option value="all">Toutes les personnes</option><option value="principals">Invités principaux</option><option value="companions">Accompagnateurs</option><option value="yes">Présences confirmées</option><option value="no">Absences</option><option value="duplicates">Doublons potentiels</option></select></div>
-        <div className="admin-guest-summary">{shown.length} {shown.length > 1 ? 'personnes affichées' : 'personne affichée'} · {summary.expectedPeople} {summary.expectedPeople > 1 ? 'personnes attendues' : 'personne attendue'} · {summary.companions} accompagnateur{summary.companions > 1 ? 's' : ''}</div><div className="admin-table-wrap"><table className="admin-guest-table"><thead><tr><th>Nom</th><th>Type</th><th>Téléphone</th><th>Invité principal</th><th>Groupe</th><th>Réponse</th><th>Créé le</th><th>Modifié le</th></tr></thead><tbody>
-          {shown.map(p=><tr key={p.key}><td>{p.name}{p.duplicate&&<span className="admin-duplicate" title="Un nom identique apparaît dans un autre groupe">Doublon possible</span>}</td><td>{p.kind==='principal'?'Invité principal':'Accompagnateur'}</td><td>{p.phone?<a href={`tel:${p.phone.replace(/[^+\d]/g,'')}`}>{p.phone}</a>:'—'}</td><td>{p.kind==='companion'?p.principal:'—'}</td><td>{p.confirmed?`${p.groupSize} pers.`:'—'}</td><td><span className={p.confirmed?'admin-status yes':'admin-status no'}>{p.confirmed?'Présent(e)':'Absent(e)'}</span></td><td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td><td>{p.updatedAt?new Date(p.updatedAt).toLocaleDateString('fr-FR'):'—'}</td></tr>)}
-          {!shown.length&&<tr><td colSpan={8} className="admin-empty">{loading?'Chargement…':'Aucune personne pour ce filtre.'}</td></tr>}</tbody></table></div>
-        <p className="admin-muted admin-export-note"><Download size={14}/> Les accompagnateurs n’ont pas de numéro propre : leur contact de référence est l’invité principal.</p></div>}
+      {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Qui vient ?</h3><p className="admin-muted">Chaque carte est un invité, avec les proches qui viennent avec lui.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Télécharger la liste (Excel)</button></div>
+        <div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Chercher un nom…" aria-label="Chercher un nom"/></div>
+        <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
+        <ul className="admin-guest-list">
+          {shown.map(g=>{const digits=g.phone?phoneDigits(g.phone):'';return <li className="admin-guest-card" key={g.id}>
+            <div className="admin-guest-top"><b>{g.name}</b><span className={g.confirmed?'admin-status yes':'admin-status no'}>{g.confirmed?'Vient':'Ne vient pas'}</span></div>
+            {g.confirmed&&<p className="admin-guest-line"><Users size={16}/><span>{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
+            {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> WhatsApp</a></div>}
+            {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
+            <p className="admin-guest-date">Répondu le {new Date(g.createdAt).toLocaleDateString('fr-FR')}{g.updatedAt&&g.updatedAt!==g.createdAt&&` · modifié le ${new Date(g.updatedAt).toLocaleDateString('fr-FR')}`}</p>
+          </li>;})}
+          {!shown.length&&<li className="admin-empty">{loading?'Chargement…':groups.length===0?'Aucune réponse pour le moment.':'Aucun résultat. Essayez un autre nom ou choisissez « Tous ».'}</li>}
+        </ul>
+        <p className="admin-muted admin-export-note">Le numéro affiché est celui de l’invité : ses proches n’ont pas de numéro propre.</p></div>}
     </section></div><footer className="admin-dashboard-footer">Espace privé de l’organisation · <Link href="/">Retour à l’invitation</Link></footer>
   </div></main>;
 }

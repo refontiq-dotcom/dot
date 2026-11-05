@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
   const guestKey = normalizeNameKey(guestName);
   if (guestKey && companions.keys.includes(guestKey)) {
-    return jsonError('Un accompagnateur porte le même nom que l’invité principal. Corrigez le formulaire.', 400, 'invalid_companions');
+    return jsonError('Un proche porte le même nom que vous. Corrigez le formulaire.', 400, 'invalid_companions');
   }
 
   const supabase = getAdminClient();
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
   if (error) {
     const message = error.message ?? '';
     if (message.includes('duplicate_companion')) {
-      return jsonError('Le même accompagnateur est renseigné deux fois.', 400, 'invalid_companions');
+      return jsonError('Le même proche est indiqué deux fois.', 400, 'invalid_companions');
     }
     if (message.includes('companions_without_attendance')) {
-      return jsonError('Aucun accompagnateur ne peut être enregistré pour une absence.', 400, 'invalid_companions');
+      return jsonError('Aucun proche ne peut être indiqué pour une absence.', 400, 'invalid_companions');
     }
     if (message.includes('invalid_')) {
       return jsonError('Les informations transmises sont incomplètes ou invalides.', 400);
