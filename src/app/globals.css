@@ -333,3 +333,26 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 .timeline-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
 .timeline-head h3{margin:0}
 .timeline-time{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:99px;background:#e4f2f7;color:#0d5d73;font-size:13px;font-weight:700;white-space:nowrap}
+
+/* Programme de la journée */
+.program{margin-top:22px}
+.program-group{margin-bottom:26px}
+.program-phase{display:inline-block;margin:0 0 14px;padding:7px 15px;border-radius:99px;background:var(--deep);color:#fff;font-size:15px;letter-spacing:.02em}
+.program-steps{list-style:none;margin:0;padding:0 0 0 12px;border-left:2px solid #cfdbe6;display:grid;gap:12px}
+.program-step{position:relative;display:grid;grid-template-columns:118px 1fr;gap:14px;background:#fff;border:1px solid #e2e9f0;border-radius:14px;padding:14px 16px 14px 18px}
+.program-step::before{content:'';position:absolute;left:-20px;top:20px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+.program-step.is-key{background:#fff8ec;border-color:#f0dcb8}
+.program-step.is-key::before{background:var(--accent);box-shadow:0 0 0 5px rgba(212,160,60,.22)}
+.program-time{font-weight:800;color:var(--deep);font-size:15px;line-height:1.35;white-space:nowrap}
+.program-body h4{margin:0 0 4px;font-size:17px;color:var(--deep);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.program-body p{margin:0;color:var(--muted);font-size:15px}
+.program-body .tag{margin-top:8px;display:inline-block}
+.program-badge{display:inline-flex;align-items:center;gap:4px;background:var(--accent);color:#fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800;letter-spacing:.02em}
+.program-aside{position:sticky;top:96px;align-self:start}
+.program.reveal-on .program-step,.program.reveal-on .program-phase{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+.program.reveal-on .program-step.is-visible,.program.reveal-on .program-phase.is-visible{opacity:1;transform:none}
+@media(max-width:760px){.program-step{grid-template-columns:1fr;gap:4px}.program-time{white-space:normal}.program-aside{position:static}}
+@media(prefers-reduced-motion:reduce){.program.reveal-on .program-step,.program.reveal-on .program-phase{opacity:1;transform:none;transition:none}}
+.admin-icon-button{min-width:40px;min-height:40px}
+.admin-icon-button:disabled{opacity:.3;cursor:default}
+.admin-edit-card-head{gap:10px}

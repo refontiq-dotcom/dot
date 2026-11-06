@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
+import ProgramTimeline from '@/components/ProgramTimeline';
 import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
@@ -37,7 +38,6 @@ function Calendar() {
 
 export default function Home() {
   const [content, setContent] = useState<Content>(initialContent);
-  const [updated, setUpdated] = useState<string>('');
   const [guestName, setGuestName] = useState('');
   const [phone, setPhone] = useState('');
   const [attending, setAttending] = useState('yes');
@@ -72,10 +72,6 @@ export default function Home() {
         const loaded = await loadContent();
         if (!cancelled) {
           setContent(loaded);
-          setUpdated(new Date().toLocaleString('fr-FR', {
-            dateStyle: 'long',
-            timeStyle: 'short',
-          }));
         }
       } catch {
         if (!cancelled) {
@@ -186,7 +182,9 @@ export default function Home() {
   const countdownLabel = countdown.state === 'remaining'
     ? `Cérémonie dans ${countdown.days} ${countdown.days > 1 ? 'jours' : 'jour'}, ${countdown.hours} h ${String(countdown.minutes).padStart(2, '0')} min et ${String(countdown.seconds).padStart(2, '0')} s`
     : `Cérémonie le ${formattedEventDate} à ${formattedEventTime}`;
-  const stamp = updated || 'Mise à jour non renseignée';
+  const stamp = content.updatedAt
+    ? new Date(content.updatedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
+    : '';
   const venueMapUrl = (() => {
     try {
       const parsed = new URL(content.mapUrl);
@@ -418,7 +416,7 @@ export default function Home() {
               <div>
                 <h3>Information des familles</h3>
                 <p>{content.announcement}</p>
-                <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>
+                {stamp && <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>}
               </div>
             </div>
             <p className="latest"><Info size={14} style={{ verticalAlign: '-2px' }} /> Les détails encore en préparation sont indiqués « à confirmer ».</p>
@@ -430,28 +428,14 @@ export default function Home() {
             <div data-reveal>
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
-              <p style={{ color: 'var(--muted)' }}>Les familles compléteront cette page au fur et à mesure. Seules les informations confirmées sont présentées comme définitives.</p>
-              <div className="timeline">
-                {content.items.map(item => (
-                  <div className="timeline-item" key={item.id} data-reveal>
-                    <div className="dot" />
-                    <div>
-                      <div className="timeline-head">
-                        <h3>{item.title}</h3>
-                        {item.time && <span className="timeline-time"><Clock3 size={14} /> {item.time.replace(':', ' h ')}</span>}
-                      </div>
-                      <p style={{ color: 'var(--muted)', marginBottom: 0 }}>{item.detail}</p>
-                      <span className={`tag ${item.confirmed ? 'confirmed' : ''}`}>{item.confirmed ? 'Confirmé' : 'À confirmer'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p style={{ color: 'var(--muted)' }}>Voici le déroulé complet de la journée. Les horaires peuvent légèrement évoluer : revenez consulter cette page.</p>
+              <ProgramTimeline items={content.items} />
             </div>
-            <div className="card" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
+            <div className="card program-aside" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
               <div className="iconbox"><Clock3 /></div>
               <h3>Un programme qui évolue</h3>
               <p>Revenez consulter cette page avant la cérémonie : les dernières précisions seront publiées ici par les familles.</p>
-              <p className="latest">Dernière mise à jour : {stamp}</p>
+              {stamp && <p className="latest">Dernière mise à jour : {stamp}</p>}
             </div>
           </div>
         </section>

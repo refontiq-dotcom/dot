@@ -1,9 +1,10 @@
-export type Item = { id: string; title: string; detail: string; time?: string; confirmed: boolean };
+export type Item = { id: string; title: string; detail: string; confirmed: boolean; timeBegin?: string; timeEnd?: string; phase?: string; highlight?: boolean };
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type BusLine = { id: string; number: string; from: string; to: string };
 export type TravelContent = { stopName: string; walkNote: string; taxiFrom: string; taxiStop: string; taxiDestination: string; busLines: BusLine[] };
 export type Content = {
+  updatedAt?: string;
   heroTitle: string;
   travel: TravelContent;
   pagne: PagneContent;
@@ -47,9 +48,21 @@ export const initialContent: Content = {
   },
   announcement: 'Bienvenue sur votre espace famille. Les prochaines informations seront partagées ici.',
   items: [
-    { id: 'arrival', title: 'Accueil des familles', detail: 'Horaire à confirmer par les familles.', confirmed: false },
-    { id: 'ceremony', title: 'Cérémonie traditionnelle', detail: '12 décembre 2026 à 14 h 00.', time: '14:00', confirmed: true },
-    { id: 'program-next', title: 'Suite du programme', detail: 'Informations à venir.', confirmed: false },
+    { id: 'step-1', timeBegin: '06:00', timeEnd: '08:00', phase: 'Matinée en famille', title: 'Préparation et mise en beauté', detail: 'Maquillage professionnel et coiffure de la mariée à domicile.', highlight: false, confirmed: true },
+    { id: 'step-2', timeBegin: '08:00', timeEnd: '08:30', phase: 'Matinée en famille', title: 'Mise en place logistique', detail: 'Ajustement final de la sonorisation, nappage des tables et disposition des chaises.', highlight: false, confirmed: true },
+    { id: 'step-3', timeBegin: '08:30', timeEnd: '09:00', phase: 'Matinée en famille', title: 'Rassemblement des familles', detail: 'Arrivée de la délégation du marié. Accueil discret et séparation initiale des deux familles.', highlight: false, confirmed: true },
+    { id: 'step-4', timeBegin: '09:00', timeEnd: '11:00', phase: 'Matinée en famille', title: 'Cérémonie traditionnelle de la dot', detail: 'Libations, négociation des porte-paroles, vérification des présents de la dot et bénédiction des patriarches.', highlight: true, confirmed: true },
+    { id: 'step-5', timeBegin: '11:00', timeEnd: '11:30', phase: 'Matinée en famille', title: 'Séance photo officielle en famille', detail: 'Prise de vue exclusive avec les parents et les témoins avant l’effervescence du public.', highlight: false, confirmed: true },
+    { id: 'step-6', timeBegin: '11:30', timeEnd: '11:45', phase: 'Accueil des invités', title: 'Installation du public et ouverture', detail: 'Accueil et placement des invités (voisins, collègues, amis) sous les grandes bâches.', highlight: false, confirmed: true },
+    { id: 'step-7', timeBegin: '11:45', timeEnd: '12:15', phase: 'Accueil des invités', title: 'Prière et lancement du buffet', detail: 'Bénédiction solennelle de la nourriture par le Pasteur ou le Prêtre. Ouverture des boissons.', highlight: false, confirmed: true },
+    { id: 'step-8', timeBegin: '12:15', timeEnd: '13:00', phase: 'Accueil des invités', title: 'Service des entrées', detail: 'Distribution des rafraîchissements (jus locaux, eau, bières) et amuse-bouches.', highlight: false, confirmed: true },
+    { id: 'step-9', timeBegin: '13:00', timeEnd: '', phase: 'Accueil des invités', title: 'Fin des installations', detail: 'Clôture de l’accès aux places assises pour figer l’audience et préparer l’entrée royale.', highlight: false, confirmed: true },
+    { id: 'step-10', timeBegin: '13:30', timeEnd: '14:00', phase: 'Fête et sorties de la mariée', title: 'Première sortie de la mariée', detail: 'Entrée en pagne uniforme : la mariée fait sa première apparition officielle avec son cortège.', highlight: true, confirmed: true },
+    { id: 'step-11', timeBegin: '14:00', timeEnd: '15:00', phase: 'Fête et sorties de la mariée', title: 'Plat principal et animation', detail: 'Service du plat principal chaud (tchep, alloco, foutou) accompagné par l’animation du MC.', highlight: false, confirmed: true },
+    { id: 'step-12', timeBegin: '15:00', timeEnd: '15:30', phase: 'Fête et sorties de la mariée', title: 'Deuxième sortie de la mariée', detail: 'Entrée royale en pagne Kita / Kente : présentation de la mariée parée de ses attributs royaux.', highlight: true, confirmed: true },
+    { id: 'step-13', timeBegin: '15:30', timeEnd: '16:30', phase: 'Fête et sorties de la mariée', title: 'Animation, gâteau et rituels', detail: 'Animation dansante majeure de la mi-journée, coupure du gâteau et photos par table.', highlight: false, confirmed: true },
+    { id: 'step-14', timeBegin: '16:30', timeEnd: '17:00', phase: 'Fête et sorties de la mariée', title: 'Troisième sortie et allocutions', detail: 'Apparition en tenue finale (tenue nigériane). Mots de remerciement officiels des mariés.', highlight: true, confirmed: true },
+    { id: 'step-15', timeBegin: '17:00', timeEnd: '18:00', phase: 'Fête et sorties de la mariée', title: 'Ambiance libre', detail: 'Clôture du protocole. Piste de danse ouverte à tous les invités.', highlight: false, confirmed: true },
   ],
   faq: [
     { id: 'dress', title: 'Quelle tenue porter ?', detail: 'Les indications vestimentaires seront communiquées par les familles.', confirmed: false },
@@ -100,10 +113,9 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
   return {
     async get() {
       const [siteResult, programResult, faqResult] = await Promise.all([
-        supabase.from('site_content').select('key, value').in('key', ['content', 'announcement', 'whatsapp']),
-        // select('*') keeps the public page working before the "time" column migration is applied.
-        supabase.from('program_items').select('*').order('sort_order', { ascending: true }),
-        supabase.from('faq_items').select('id, question, answer, confirmed, sort_order').order('sort_order', { ascending: true }),
+        supabase.from('site_content').select('key, value, updated_at').in('key', ['content', 'announcement', 'whatsapp']),
+        supabase.from('program_items').select('id, title, detail, confirmed, sort_order, time_begin, time_end, phase, highlight, updated_at').order('sort_order', { ascending: true }),
+        supabase.from('faq_items').select('id, question, answer, confirmed, sort_order, updated_at').order('sort_order', { ascending: true }),
       ]);
       if (siteResult.error) throw siteResult.error;
       if (programResult.error) throw programResult.error;
@@ -113,21 +125,23 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       const value = (rows.find(row => row.key === 'content')?.value ?? {}) as Partial<Content>;
       const legacyAnnouncement = rows.find(row => row.key === 'announcement')?.value as { text?: string } | undefined;
       const legacyWhatsApp = rows.find(row => row.key === 'whatsapp')?.value as { number?: string } | undefined;
+      // Vraie date de dernière modification : la plus récente parmi le contenu, le programme et la FAQ.
+      const stamps = [
+        ...rows.map(row => row.updated_at as string | null),
+        ...(programResult.data ?? []).map(item => item.updated_at as string | null),
+        ...(faqResult.data ?? []).map(item => item.updated_at as string | null),
+      ].filter((v): v is string => Boolean(v)).map(v => new Date(v).getTime()).filter(n => !Number.isNaN(n));
+      const updatedAt = stamps.length ? new Date(Math.max(...stamps)).toISOString() : undefined;
       return {
         ...initialContent,
         ...value,
+        updatedAt,
         pagne: { ...initialContent.pagne, ...(value.pagne ?? {}) },
         travel: { ...initialContent.travel, ...(value.travel ?? {}) },
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: Array.isArray(programResult.data)
-          ? programResult.data.map(item => ({
-            id: item.id,
-            title: item.title,
-            detail: item.detail ?? '',
-            time: typeof item.time === 'string' ? item.time : '',
-            confirmed: item.confirmed,
-          }))
+          ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed, timeBegin: item.time_begin ?? '', timeEnd: item.time_end ?? '', phase: item.phase ?? '', highlight: item.highlight === true }))
           : (value.items ?? initialContent.items),
         faq: Array.isArray(faqResult.data)
           ? faqResult.data.map(item => ({ id: item.id, title: item.question, detail: item.answer, confirmed: item.confirmed }))
@@ -135,7 +149,8 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       };
     },
     async set(content) {
-      const { items, faq, ...siteValues } = content;
+      const { items, faq, updatedAt, ...siteValues } = content;
+      void updatedAt;
       // site_content.key has a UNIQUE constraint in the live schema, so this upsert is valid.
       // Legacy announcement and whatsapp rows are left untouched.
       const siteResult = await supabase.from('site_content').upsert(
@@ -184,7 +199,9 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       };
 
       await syncItems('program_items', items, (item, sortOrder) => ({
-        title: item.title, detail: item.detail, time: item.time?.trim() || null, confirmed: item.confirmed, sort_order: sortOrder,
+        title: item.title, detail: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
+        time_begin: item.timeBegin?.trim() || null, time_end: item.timeEnd?.trim() || null,
+        phase: item.phase?.trim() || null, highlight: item.highlight === true,
       }));
       await syncItems('faq_items', faq, (item, sortOrder) => ({
         question: item.title, answer: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
