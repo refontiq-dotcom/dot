@@ -178,7 +178,9 @@ export default function AdminPage() {
         <div className="admin-form-grid">
           <div className="admin-full"><label>Arrêt où tous les bus descendent</label><input value={content.travel.stopName} onChange={e=>setTravel({stopName:e.target.value})} placeholder="Ex. : Commissariat du 22e arrondissement"/></div>
           <div className="admin-full"><label>Trajet à pied depuis l’arrêt</label><textarea rows={3} value={content.travel.walkNote} onChange={e=>setTravel({walkNote:e.target.value})}/></div>
-          <div className="admin-full"><label>Destination à donner au taxi ou à Yango</label><input value={content.travel.taxiDestination} onChange={e=>setTravel({taxiDestination:e.target.value})}/></div>
+          <div><label>Taxi : où le prendre</label><input value={content.travel.taxiFrom} onChange={e=>setTravel({taxiFrom:e.target.value})} placeholder="Ex. : Carrefour La Vie"/></div>
+          <div><label>Taxi : où descendre</label><input value={content.travel.taxiStop} onChange={e=>setTravel({taxiStop:e.target.value})} placeholder="Ex. : Carrefour du commissariat du 22e"/></div>
+          <div className="admin-full"><label>Destination à entrer dans Yango (facultatif)</label><input value={content.travel.taxiDestination} onChange={e=>setTravel({taxiDestination:e.target.value})}/></div>
         </div>
         <div className="admin-inline-head"><div><h3>Les bus</h3><p className="admin-muted">Une ligne par bus : son numéro, d’où il part, et sa direction.</p></div><button className="button secondary small" onClick={addBusLine}><Plus size={16}/> Ajouter un bus</button></div>
         {content.travel.busLines.map((line,i)=><div className="admin-edit-card" key={line.id}><div className="admin-edit-card-head"><b>Bus {line.number||i+1}</b><button className="admin-icon-button danger" onClick={()=>removeBusLine(i)} aria-label="Supprimer ce bus"><Trash2/></button></div>

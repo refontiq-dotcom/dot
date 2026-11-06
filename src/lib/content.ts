@@ -2,7 +2,7 @@ export type Item = { id: string; title: string; detail: string; confirmed: boole
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type BusLine = { id: string; number: string; from: string; to: string };
-export type TravelContent = { stopName: string; walkNote: string; taxiDestination: string; busLines: BusLine[] };
+export type TravelContent = { stopName: string; walkNote: string; taxiFrom: string; taxiStop: string; taxiDestination: string; busLines: BusLine[] };
 export type Content = {
   heroTitle: string;
   travel: TravelContent;
@@ -26,6 +26,8 @@ export const initialContent: Content = {
   travel: {
     stopName: 'Commissariat du 22e arrondissement',
     walkNote: 'Depuis l’arrêt, marchez jusqu’à Laser Park, puis jusqu’au lieu de réception.',
+    taxiFrom: 'Carrefour La Vie',
+    taxiStop: 'Carrefour du commissariat du 22e arrondissement',
     taxiDestination: 'Laser Park, Cocody Angré Mahou',
     busLines: [
       { id: 'bus-81', number: '81', from: 'Gare Nord (Adjamé)', to: '' },

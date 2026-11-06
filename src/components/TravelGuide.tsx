@@ -68,15 +68,24 @@ export default function TravelGuide({ travel, mapUrl }: { travel: TravelContent;
         {mode === 'taxi' && (
           <ol className="travel-steps">
             <li>
-              <h4>Donnez cette destination</h4>
-              <p>Au chauffeur, ou dans l’application Yango :</p>
-              <div className="travel-stop"><MapPinned size={22} /><div><strong>{travel.taxiDestination}</strong></div></div>
+              <h4>Prenez un taxi depuis ce point</h4>
+              <div className="travel-stop"><MapPinned size={22} /><div><strong>{travel.taxiFrom}</strong><small>Point de départ conseillé.</small></div></div>
+            </li>
+            <li>
+              <h4>Descendez à ce carrefour</h4>
+              <div className="travel-stop"><MapPinned size={22} /><div><strong>{travel.taxiStop}</strong></div></div>
             </li>
             <li>
               <h4>Terminez à pied</h4>
-              <p>À l’arrivée, un court trajet à pied vous mène jusqu’au lieu de réception.</p>
+              <p>{travel.walkNote}</p>
               {mapsButton}
             </li>
+            {travel.taxiDestination.trim() && (
+              <li className="travel-alt">
+                <h4>Vous préférez Yango ?</h4>
+                <p>Entrez cette destination dans l’application : <strong>{travel.taxiDestination}</strong></p>
+              </li>
+            )}
           </ol>
         )}
 
