@@ -1,8 +1,11 @@
 export type Item = { id: string; title: string; detail: string; confirmed: boolean };
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
+export type BusLine = { id: string; number: string; from: string; to: string };
+export type TravelContent = { stopName: string; walkNote: string; taxiDestination: string; busLines: BusLine[] };
 export type Content = {
   heroTitle: string;
+  travel: TravelContent;
   pagne: PagneContent;
   announcement: string;
   items: Item[];
@@ -20,6 +23,19 @@ export type Content = {
 
 export const initialContent: Content = {
   heroTitle: 'Deux peuples pour une union sacrée',
+  travel: {
+    stopName: 'Commissariat du 22e arrondissement',
+    walkNote: 'Depuis l’arrêt, marchez jusqu’à Laser Park, puis jusqu’au lieu de réception.',
+    taxiDestination: 'Laser Park, Cocody Angré Mahou',
+    busLines: [
+      { id: 'bus-81', number: '81', from: 'Gare Nord (Adjamé)', to: '' },
+      { id: 'bus-82', number: '82', from: 'Gare Sud (Plateau)', to: '' },
+      { id: 'bus-90', number: '90', from: 'Cocody Blockhaus', to: '' },
+      { id: 'bus-719', number: '719', from: 'Yopougon Saint-André', to: 'Cocody Terminus 81-82' },
+      { id: 'bus-775', number: '775', from: 'Gare de Passam (Fraîcheville)', to: 'Angré Château (Cocody)' },
+      { id: 'bus-704', number: '704', from: 'Saint-Jean (Cocody)', to: 'Angré Château' },
+    ],
+  },
   pagne: {
     enabled: true,
     price: 2500,
@@ -63,7 +79,8 @@ class LocalStorageRepository implements ContentRepository {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return { ...initialContent, ...(parsed.content as Partial<Content>) };
+        const stored = parsed.content as Partial<Content>;
+        return { ...initialContent, ...stored, travel: { ...initialContent.travel, ...(stored.travel ?? {}) } };
       }
     } catch {}
     return initialContent;
@@ -97,6 +114,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
         ...initialContent,
         ...value,
         pagne: { ...initialContent.pagne, ...(value.pagne ?? {}) },
+        travel: { ...initialContent.travel, ...(value.travel ?? {}) },
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: Array.isArray(programResult.data)

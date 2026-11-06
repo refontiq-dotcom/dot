@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
 import { declaredGroupSize, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
@@ -13,7 +13,7 @@ type Companion = { id: string; full_name: string; position: number };
 type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
 type GuestFilter = 'all' | 'yes' | 'no' | 'check';
 type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
-type Tab = 'overview' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
+type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
   const [password,setPassword]=useState(''),[ready,setReady]=useState(false),[logged,setLogged]=useState(false);
@@ -48,10 +48,14 @@ export default function AdminPage() {
   }
   async function logout(){await getSupabase().auth.signOut();setLogged(false);setGuests([]);}
   function field<K extends keyof Content>(key:K,value:Content[K]){setContent(v=>({...v,[key]:value}));}
+  function setTravel(patch:Partial<Content['travel']>){setContent(v=>({...v,travel:{...v.travel,...patch}}));}
+  function editBusLine(i:number,patch:Partial<Content['travel']['busLines'][number]>){setContent(v=>({...v,travel:{...v.travel,busLines:v.travel.busLines.map((l,n)=>n===i?{...l,...patch}:l)}}));}
+  function addBusLine(){setContent(v=>({...v,travel:{...v.travel,busLines:[...v.travel.busLines,{id:crypto.randomUUID(),number:'',from:'',to:''}]}}));}
+  function removeBusLine(i:number){setContent(v=>({...v,travel:{...v.travel,busLines:v.travel.busLines.filter((_,n)=>n!==i)}}));}
   function editItem(list:'items'|'faq',i:number,patch:Partial<Item>){setContent(v=>({...v,[list]:v[list].map((x,n)=>n===i?{...x,...patch}:x)}));}
   function addItem(list:'items'|'faq'){setContent(v=>({...v,[list]:[...v[list],{id:crypto.randomUUID(),title:'',detail:'',confirmed:false}]}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
-  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};await saveContent(next);setContent(next);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.travel.stopName.trim())throw new Error('Indiquez le nom de l’arrêt où les bus descendent.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};await saveContent(next);setContent(next);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
   async function uploadPagneImage(event:ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     event.target.value='';
@@ -123,6 +127,7 @@ export default function AdminPage() {
     {id:'overview',label:'Accueil',help:'Un résumé simple de vos invités et de ce qu’il reste à faire.',icon:<Home/>},
     {id:'guests',label:'Liste des invités',help:'Qui vient, avec qui, et comment les joindre.',icon:<Users/>},
     {id:'event',label:'Titre, date et lieu',help:'Le titre du site, la date, l’heure et le lieu affichés sur l’invitation.',icon:<MapPin/>},
+    {id:'travel',label:'Trajet (bus, taxi)',help:'Les bus et les indications montrés aux invités après leur confirmation.',icon:<Bus/>},
     {id:'program',label:'Programme',help:'Les étapes de la journée, telles que vos invités les voient.',icon:<ListChecks/>},
     {id:'announcement',label:'Message aux invités',help:'Un message mis en avant en haut du site.',icon:<Megaphone/>},
     {id:'faq',label:'Questions des invités',help:'Les réponses aux questions que se posent vos invités.',icon:<CircleHelp/>},
@@ -168,6 +173,17 @@ export default function AdminPage() {
         <div className="admin-full"><label>Lien Google Maps / itinéraire</label><input type="url" value={content.mapUrl} onChange={e=>field('mapUrl',e.target.value)} placeholder="https://maps.google.com/…"/><small className="admin-muted">Collez le lien de partage Google Maps.</small></div>
         <div className="admin-full"><label>WhatsApp Refontiq</label><input value={content.refoWhatsApp} onChange={e=>field('refoWhatsApp',e.target.value)}/></div></div>
         <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer les informations'}</button></div>}
+
+      {tab==='travel'&&<div className="admin-panel"><h3>Comment venir</h3><p className="admin-muted">Vos invités voient ces informations après avoir confirmé leur présence.</p>
+        <div className="admin-form-grid">
+          <div className="admin-full"><label>Arrêt où tous les bus descendent</label><input value={content.travel.stopName} onChange={e=>setTravel({stopName:e.target.value})} placeholder="Ex. : Commissariat du 22e arrondissement"/></div>
+          <div className="admin-full"><label>Trajet à pied depuis l’arrêt</label><textarea rows={3} value={content.travel.walkNote} onChange={e=>setTravel({walkNote:e.target.value})}/></div>
+          <div className="admin-full"><label>Destination à donner au taxi ou à Yango</label><input value={content.travel.taxiDestination} onChange={e=>setTravel({taxiDestination:e.target.value})}/></div>
+        </div>
+        <div className="admin-inline-head"><div><h3>Les bus</h3><p className="admin-muted">Une ligne par bus : son numéro, d’où il part, et sa direction.</p></div><button className="button secondary small" onClick={addBusLine}><Plus size={16}/> Ajouter un bus</button></div>
+        {content.travel.busLines.map((line,i)=><div className="admin-edit-card" key={line.id}><div className="admin-edit-card-head"><b>Bus {line.number||i+1}</b><button className="admin-icon-button danger" onClick={()=>removeBusLine(i)} aria-label="Supprimer ce bus"><Trash2/></button></div>
+          <div className="admin-form-grid"><div><label>Numéro de la ligne</label><input value={line.number} onChange={e=>editBusLine(i,{number:e.target.value})} placeholder="Ex. : 775"/></div><div><label>Part de</label><input value={line.from} onChange={e=>editBusLine(i,{from:e.target.value})} placeholder="Ex. : Yopougon Saint-André"/></div><div className="admin-full"><label>Direction (facultatif)</label><input value={line.to} onChange={e=>editBusLine(i,{to:e.target.value})} placeholder="Ex. : Angré Château"/></div></div></div>)}
+        <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer le trajet'}</button></div>}
 
       {tab==='program'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Programme de la journée</h3><p className="admin-muted">Ajoutez, modifiez, confirmez ou supprimez une étape.</p></div><button className="button secondary small" onClick={()=>addItem('items')}><Plus size={16}/> Ajouter</button></div>
         {content.items.map((item,i)=><div className="admin-edit-card" key={item.id}><div className="admin-edit-card-head"><b>Étape {i+1}</b><button className="admin-icon-button danger" onClick={()=>removeItem('items',i)} aria-label="Supprimer"><Trash2/></button></div>

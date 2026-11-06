@@ -19,6 +19,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
+import TravelGuide from '@/components/TravelGuide';
 import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
@@ -446,34 +447,7 @@ export default function Home() {
                 <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
               </div>
               {showTravelGuide ? (
-                <div className="travel-guide" aria-live="polite">
-                  <div className="card" style={{ marginTop: 24 }}>
-                    <div className="eyebrow">Votre accès à la réception</div>
-                    <h3>Merci d’avoir confirmé votre présence !</h3>
-                    <p>Voici les indications pour rejoindre facilement le lieu de la cérémonie.</p>
-                    <a href={venueMapUrl} target="_blank" rel="noreferrer" className="button" style={{ marginTop: 12 }}><Navigation size={17} /> Ouvrir l’itinéraire Google Maps</a>
-                  </div>
-                  <div className="card" style={{ marginTop: 16 }}>
-                    <div className="eyebrow">En transport en commun</div>
-                    <h3>En bus SOTRA</h3>
-                    <p>Les lignes ci-dessous desservent l’arrêt du commissariat du 22e arrondissement. Descendez à cet arrêt, puis suivez l’itinéraire à pied vers Laser Park et le lieu de réception.</p>
-                    <ul>
-                      <li><strong>81 :</strong> au départ de la Gare Nord (Adjamé).</li>
-                      <li><strong>82 :</strong> au départ de la Gare Sud (Plateau).</li>
-                      <li><strong>90 :</strong> au départ de Cocody Blockhaus.</li>
-                      <li><strong>719 :</strong> au départ de Yopougon Saint-André.</li>
-                      <li><strong>775 :</strong> descendez à l’arrêt du commissariat du 22e arrondissement.</li>
-                      <li><strong>704 :</strong> descendez à l’arrêt du commissariat du 22e arrondissement.</li>
-                    </ul>
-                    <p>À l’arrêt du commissariat du 22e, ouvrez l’itinéraire Google Maps pour terminer le trajet à pied.</p>
-                  </div>
-                  <div className="card" style={{ marginTop: 16 }}>
-                    <div className="eyebrow">En taxi ou en voiture</div>
-                    <h3>Taxi compteur, Yango ou véhicule personnel</h3>
-                    <p><strong>En taxi compteur ou avec Yango :</strong> indiquez « Laser Park, Cocody Angré Mahou » comme destination. À l’arrivée, suivez le court trajet à pied jusqu’au lieu de réception.</p>
-                    <p><strong>Avec votre propre voiture :</strong> ouvrez l’itinéraire Google Maps et suivez le trajet jusqu’au lieu de réception.</p>
-                  </div>
-                </div>
+                <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
               ) : (
                 <div className="card" style={{ marginTop: 24 }}>
                   <div className="eyebrow">Accès aux indications détaillées</div>
