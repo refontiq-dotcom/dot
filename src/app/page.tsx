@@ -436,7 +436,10 @@ export default function Home() {
                   <div className="timeline-item" key={item.id} data-reveal>
                     <div className="dot" />
                     <div>
-                      <h3>{item.title}</h3>
+                      <div className="timeline-head">
+                        <h3>{item.title}</h3>
+                        {item.time && <span className="timeline-time"><Clock3 size={14} /> {item.time.replace(':', ' h ')}</span>}
+                      </div>
                       <p style={{ color: 'var(--muted)', marginBottom: 0 }}>{item.detail}</p>
                       <span className={`tag ${item.confirmed ? 'confirmed' : ''}`}>{item.confirmed ? 'Confirmé' : 'À confirmer'}</span>
                     </div>

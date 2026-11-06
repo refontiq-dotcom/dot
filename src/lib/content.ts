@@ -1,4 +1,4 @@
-export type Item = { id: string; title: string; detail: string; confirmed: boolean };
+export type Item = { id: string; title: string; detail: string; time?: string; confirmed: boolean };
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type BusLine = { id: string; number: string; from: string; to: string };
@@ -48,7 +48,7 @@ export const initialContent: Content = {
   announcement: 'Bienvenue sur votre espace famille. Les prochaines informations seront partagées ici.',
   items: [
     { id: 'arrival', title: 'Accueil des familles', detail: 'Horaire à confirmer par les familles.', confirmed: false },
-    { id: 'ceremony', title: 'Cérémonie traditionnelle', detail: '12 décembre 2026 à 14 h 00.', confirmed: true },
+    { id: 'ceremony', title: 'Cérémonie traditionnelle', detail: '12 décembre 2026 à 14 h 00.', time: '14:00', confirmed: true },
     { id: 'program-next', title: 'Suite du programme', detail: 'Informations à venir.', confirmed: false },
   ],
   faq: [
@@ -101,7 +101,8 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
     async get() {
       const [siteResult, programResult, faqResult] = await Promise.all([
         supabase.from('site_content').select('key, value').in('key', ['content', 'announcement', 'whatsapp']),
-        supabase.from('program_items').select('id, title, detail, confirmed, sort_order').order('sort_order', { ascending: true }),
+        // select('*') keeps the public page working before the "time" column migration is applied.
+        supabase.from('program_items').select('*').order('sort_order', { ascending: true }),
         supabase.from('faq_items').select('id, question, answer, confirmed, sort_order').order('sort_order', { ascending: true }),
       ]);
       if (siteResult.error) throw siteResult.error;
@@ -120,7 +121,13 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: Array.isArray(programResult.data)
-          ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed }))
+          ? programResult.data.map(item => ({
+            id: item.id,
+            title: item.title,
+            detail: item.detail ?? '',
+            time: typeof item.time === 'string' ? item.time : '',
+            confirmed: item.confirmed,
+          }))
           : (value.items ?? initialContent.items),
         faq: Array.isArray(faqResult.data)
           ? faqResult.data.map(item => ({ id: item.id, title: item.question, detail: item.answer, confirmed: item.confirmed }))
@@ -177,7 +184,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       };
 
       await syncItems('program_items', items, (item, sortOrder) => ({
-        title: item.title, detail: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
+        title: item.title, detail: item.detail, time: item.time?.trim() || null, confirmed: item.confirmed, sort_order: sortOrder,
       }));
       await syncItems('faq_items', faq, (item, sortOrder) => ({
         question: item.title, answer: item.detail, confirmed: item.confirmed, sort_order: sortOrder,

@@ -328,3 +328,8 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
   .hero .eyebrow,.hero h1,.hero .lead,.hero h2,.hero .date-pill,.hero .countdown,.hero .actions,.hero::before,.pagne-placeholder svg,.travel-guide,.count-value.tick,.faq details[open] p{animation:none!important}
   .anim-ready [data-reveal],.anim-ready .timeline-item .dot{opacity:1!important;transform:none!important;transition:none!important}
 }
+
+/* Heure des étapes du programme */
+.timeline-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+.timeline-head h3{margin:0}
+.timeline-time{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:99px;background:#e4f2f7;color:#0d5d73;font-size:13px;font-weight:700;white-space:nowrap}
