@@ -261,3 +261,70 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 .travel-steps .button{transition:transform .15s ease,box-shadow .2s ease}
 .travel-steps .button:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(11,47,115,.2)}
 @media(prefers-reduced-motion:reduce){.travel-card,.travel-steps>li,.travel-steps>li::after,.travel-lines li,.travel-stop svg,.travel-modes button svg{animation:none!important}.travel-modes button,.travel-steps .button{transition:none}.travel-modes button:hover,.travel-steps .button:hover{transform:none}}
+/* Animations */
+@keyframes hero-rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes hero-zoom{from{transform:scale(1.07)}to{transform:scale(1)}}
+@keyframes tick{from{opacity:.3;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@keyframes float-soft{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes faq-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* Entrée du hero */
+.hero .eyebrow,.hero h1,.hero .lead,.hero h2,.hero .date-pill,.hero .countdown,.hero .actions{animation:hero-rise .75s cubic-bezier(.22,.61,.36,1) both}
+.hero .eyebrow{animation-delay:.04s}
+.hero h1{animation-delay:.1s}
+.hero .lead{animation-delay:.2s}
+.hero h2{animation-delay:.28s}
+.hero .date-pill{animation-delay:.36s}
+.hero .countdown{animation-delay:.44s}
+.hero .actions{animation-delay:.52s}
+.hero::before{animation:hero-zoom 16s ease-out both}
+
+/* Apparition au défilement */
+.anim-ready [data-reveal]{opacity:0;transform:translate3d(0,24px,0);transition:opacity .7s cubic-bezier(.22,.61,.36,1) var(--reveal-delay,0ms),transform .7s cubic-bezier(.22,.61,.36,1) var(--reveal-delay,0ms),box-shadow .3s ease}
+.anim-ready [data-reveal].is-revealed{opacity:1;transform:none}
+.anim-ready .timeline [data-reveal]:nth-child(2),.anim-ready .faq [data-reveal]:nth-child(2){--reveal-delay:80ms}
+.anim-ready .timeline [data-reveal]:nth-child(3),.anim-ready .faq [data-reveal]:nth-child(3){--reveal-delay:160ms}
+.anim-ready .timeline [data-reveal]:nth-child(4),.anim-ready .faq [data-reveal]:nth-child(4){--reveal-delay:240ms}
+.anim-ready .timeline [data-reveal]:nth-child(5),.anim-ready .faq [data-reveal]:nth-child(5){--reveal-delay:320ms}
+.anim-ready .timeline [data-reveal]:nth-child(6),.anim-ready .faq [data-reveal]:nth-child(6){--reveal-delay:400ms}
+
+/* Micro-interactions */
+.button{transition:transform .18s ease,box-shadow .22s ease,background-color .2s ease,border-color .2s ease,color .2s ease}
+.button:hover{transform:translateY(-2px)}
+.button:active{transform:translateY(0)}
+.actions .button:not(.secondary):hover{box-shadow:0 16px 34px rgba(11,47,115,.26)}
+.card,.pagne-card,.announcement{transition:box-shadow .3s ease,border-color .3s ease}
+.card:hover{box-shadow:0 16px 36px rgba(51,43,64,.1)}
+.pagne-card:hover{box-shadow:0 20px 46px rgba(11,47,115,.12);border-color:#c9dcea}
+.announcement{position:relative;overflow:hidden}
+.announcement::after{content:'';position:absolute;inset:-40%;background:radial-gradient(circle at 85% 15%,rgba(255,255,255,.16),transparent 45%);opacity:0;transition:opacity .45s ease;pointer-events:none}
+.announcement:hover::after{opacity:1}
+.pagne-visual img{transition:transform .8s cubic-bezier(.22,.61,.36,1)}
+.pagne-card:hover .pagne-visual img{transform:scale(1.05)}
+.pagne-placeholder svg{animation:float-soft 3.8s ease-in-out infinite}
+.pagne-seller{transition:background-color .25s ease}
+.pagne-seller:hover{background:#f7fafc}
+.timeline-item .dot{transition:transform .25s ease,background-color .25s ease,box-shadow .25s ease}
+.timeline-item:hover .dot{transform:scale(1.18);background:var(--accent);box-shadow:0 0 0 5px rgba(15,126,155,.12)}
+.anim-ready .timeline-item .dot{transform:scale(.4);opacity:0;transition:transform .5s cubic-bezier(.34,1.56,.64,1) .12s,opacity .4s ease .12s}
+.anim-ready .timeline-item.is-revealed .dot{transform:scale(1);opacity:1}
+.anim-ready .timeline-item.is-revealed:hover .dot{transform:scale(1.18)}
+.faq details{transition:background-color .25s ease}
+.faq details[open],.faq details:hover{background:rgba(233,241,247,.45)}
+.faq summary{display:flex;align-items:center;gap:8px;list-style:none;padding-right:4px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';margin-left:auto;font:400 22px/1 Arial,Helvetica,sans-serif;color:var(--accent);transition:transform .25s ease}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details[open] p{animation:faq-in .32s ease both}
+.navlinks a{position:relative}
+.navlinks a::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
+.navlinks a:hover::after{transform:scaleX(1)}
+.mobile-nav a{transition:color .2s ease,transform .2s ease}
+.mobile-nav a[aria-current="location"]{transform:translateY(-2px)}
+.count-value.tick{display:block;animation:tick .45s ease-out}
+.travel-guide{animation:hero-rise .5s cubic-bezier(.22,.61,.36,1) both}
+
+@media(prefers-reduced-motion:reduce){
+  .hero .eyebrow,.hero h1,.hero .lead,.hero h2,.hero .date-pill,.hero .countdown,.hero .actions,.hero::before,.pagne-placeholder svg,.travel-guide,.count-value.tick,.faq details[open] p{animation:none!important}
+  .anim-ready [data-reveal],.anim-ready .timeline-item .dot{opacity:1!important;transform:none!important;transition:none!important}
+}

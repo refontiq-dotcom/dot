@@ -116,6 +116,24 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    document.documentElement.classList.add('anim-ready');
+  }, []);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -50px 0px' });
+    document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-revealed)').forEach(element => observer.observe(element));
+    return () => observer.disconnect();
+  }, [content]);
+
+  useEffect(() => {
     if (!rsvpReceipt) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const bodyOverflow = document.body.style.overflow;
@@ -337,7 +355,7 @@ export default function Home() {
                     <div className="countbox"><span>{countdown.days}</span><small>{countdown.days > 1 ? 'jours' : 'jour'}</small></div>
                     <div className="countbox"><span>{String(countdown.hours).padStart(2, '0')}</span><small>{countdown.hours > 1 ? 'heures' : 'heure'}</small></div>
                     <div className="countbox"><span>{String(countdown.minutes).padStart(2, '0')}</span><small>{countdown.minutes > 1 ? 'minutes' : 'minute'}</small></div>
-                    <div className="countbox"><span>{String(countdown.seconds).padStart(2, '0')}</span><small>{countdown.seconds > 1 ? 'secondes' : 'seconde'}</small></div>
+                    <div className="countbox"><span key={countdown.seconds} className="count-value tick">{String(countdown.seconds).padStart(2, '0')}</span><small>{countdown.seconds > 1 ? 'secondes' : 'seconde'}</small></div>
                   </>
                 ) : (
                   <>
@@ -359,19 +377,19 @@ export default function Home() {
         {content.pagne.enabled && (
           <section className="section" id="pagne">
             <div className="shell pagne-section">
-              <div className="section-head">
+              <div className="section-head" data-reveal>
                 <div className="eyebrow">Commande directe auprès des vendeurs</div>
                 <h2>Le pagne de la dot</h2>
                 <p>{content.pagne.description}</p>
               </div>
-              <div className="pagne-card">
+              <div className="pagne-card" data-reveal>
                 <div className="pagne-visual">
                   {content.pagne.imageUrl
                     ? <img src={content.pagne.imageUrl} alt="Pagne proposé pour la dot" />
                     : <div className="pagne-placeholder"><ShoppingBag size={42}/><span>Photo du pagne à venir</span></div>}
                 </div>
                 <div className="pagne-details">
-                  <div className="eyebrow">Prix du pagne</div>
+                  <div className="eyebrow">Prix du morceau de pagne</div>
                   <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA</div>
                   <p>Choisissez un vendeur et contactez-le directement pour passer votre commande.</p>
                   {content.pagne.contacts.length > 0 ? content.pagne.contacts.map((contact, index) => {
@@ -394,8 +412,8 @@ export default function Home() {
 
         <section className="section soft" id="annonces">
           <div className="shell">
-            <div className="section-head"><div className="eyebrow">À lire en premier</div><h2>La dernière nouvelle</h2></div>
-            <div className="announcement">
+            <div className="section-head" data-reveal><div className="eyebrow">À lire en premier</div><h2>La dernière nouvelle</h2></div>
+            <div className="announcement" data-reveal>
               <Megaphone size={24} style={{ flexShrink: 0, marginTop: 3 }} />
               <div>
                 <h3>Information des familles</h3>
@@ -409,13 +427,13 @@ export default function Home() {
 
         <section className="section" id="programme">
           <div className="shell location">
-            <div>
+            <div data-reveal>
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
               <p style={{ color: 'var(--muted)' }}>Les familles compléteront cette page au fur et à mesure. Seules les informations confirmées sont présentées comme définitives.</p>
               <div className="timeline">
                 {content.items.map(item => (
-                  <div className="timeline-item" key={item.id}>
+                  <div className="timeline-item" key={item.id} data-reveal>
                     <div className="dot" />
                     <div>
                       <h3>{item.title}</h3>
@@ -426,7 +444,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="card" style={{ background: 'var(--sand)', border: 0 }}>
+            <div className="card" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
               <div className="iconbox"><Clock3 /></div>
               <h3>Un programme qui évolue</h3>
               <p>Revenez consulter cette page avant la cérémonie : les dernières précisions seront publiées ici par les familles.</p>
@@ -437,7 +455,7 @@ export default function Home() {
 
         <section className="section soft" id="lieu">
           <div className="shell location">
-            <div>
+            <div data-reveal>
               <div className="eyebrow">Retrouvons-nous</div>
               <h2>Comment venir ?</h2>
               <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
@@ -457,7 +475,7 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <div className="mapbox">
+            <div className="mapbox" data-reveal>
               <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
             </div>
           </div>
@@ -465,12 +483,12 @@ export default function Home() {
 
         <section className="section soft" id="rsvp">
           <div className="shell">
-            <div className="section-head">
+            <div className="section-head" data-reveal>
               <div className="eyebrow">Votre réponse nous aide à nous organiser</div>
               <h2>Confirmer votre présence</h2>
               <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
             </div>
-            <form className="rsvp-form" onSubmit={submitRsvp}>
+            <form className="rsvp-form" onSubmit={submitRsvp} data-reveal>
               <label htmlFor="guest-name">Votre nom et prénom</label>
               <input id="guest-name" name="guestName" autoComplete="name" maxLength={120} required value={guestName} onChange={event => setGuestName(event.target.value)} placeholder="Ex. : Marie Kouassi" />
 
@@ -563,14 +581,14 @@ export default function Home() {
 
         <section className="section" id="faq">
           <div className="shell">
-            <div className="section-head">
+            <div className="section-head" data-reveal>
               <div className="eyebrow">Besoin d’un renseignement ?</div>
               <h2>Questions fréquentes</h2>
               <p>Les réponses sont ajoutées au fil des confirmations des familles.</p>
             </div>
             <div className="faq">
               {content.faq.map(item => (
-                <details key={item.id}>
+                <details key={item.id} data-reveal>
                   <summary>{item.title}{!item.confirmed && <span className="tag" style={{ marginLeft: 8 }}>À confirmer</span>}</summary>
                   <p>{item.detail}</p>
                 </details>
