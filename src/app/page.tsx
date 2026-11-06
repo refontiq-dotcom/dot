@@ -323,7 +323,7 @@ export default function Home() {
           <div className="shell hero-grid">
             <div>
               <div className="eyebrow">Une célébration de famille</div>
-              <h1 className="serif">Deux héritages,<br />une même union</h1>
+              <h1 className="serif">{content.heroTitle.trim() || initialContent.heroTitle}</h1>
               <p className="lead">Avec joie, les familles {content.familyNames} vous invitent à célébrer la dot traditionnelle :</p>
               <h2 className="serif" style={{ fontSize: 'clamp(25px,4vw,34px)', marginBottom: 8 }}>
                 {content.groomName}<br />

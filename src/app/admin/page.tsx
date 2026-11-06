@@ -51,7 +51,7 @@ export default function AdminPage() {
   function editItem(list:'items'|'faq',i:number,patch:Partial<Item>){setContent(v=>({...v,[list]:v[list].map((x,n)=>n===i?{...x,...patch}:x)}));}
   function addItem(list:'items'|'faq'){setContent(v=>({...v,[list]:[...v[list],{id:crypto.randomUUID(),title:'',detail:'',confirmed:false}]}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
-  async function save(){setSaving(true);setNotice('');try{if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');await saveContent(content);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};await saveContent(next);setContent(next);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){setNotice(e instanceof Error?e.message:'Enregistrement impossible.');}finally{setSaving(false);}}
   async function uploadPagneImage(event:ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     event.target.value='';
@@ -122,7 +122,7 @@ export default function AdminPage() {
   const tabs:{id:Tab;label:string;help:string;icon:ReactNode}[]=[
     {id:'overview',label:'Accueil',help:'Un résumé simple de vos invités et de ce qu’il reste à faire.',icon:<Home/>},
     {id:'guests',label:'Liste des invités',help:'Qui vient, avec qui, et comment les joindre.',icon:<Users/>},
-    {id:'event',label:'Date et lieu',help:'La date, l’heure et le lieu affichés sur l’invitation.',icon:<MapPin/>},
+    {id:'event',label:'Titre, date et lieu',help:'Le titre du site, la date, l’heure et le lieu affichés sur l’invitation.',icon:<MapPin/>},
     {id:'program',label:'Programme',help:'Les étapes de la journée, telles que vos invités les voient.',icon:<ListChecks/>},
     {id:'announcement',label:'Message aux invités',help:'Un message mis en avant en haut du site.',icon:<Megaphone/>},
     {id:'faq',label:'Questions des invités',help:'Les réponses aux questions que se posent vos invités.',icon:<CircleHelp/>},
@@ -138,7 +138,7 @@ export default function AdminPage() {
   const eventDay=(()=>{const d=new Date(`${content.eventDate}T12:00:00`);return Number.isNaN(d.getTime())?content.eventDate:d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();
   const current=tabs.find(t=>t.id===tab);
   return <main className="admin-wrap"><div className="shell">
-    <header className="admin-dashboard-head"><div><div className="eyebrow">Deux héritages, une même union</div><h1>Espace organisateurs</h1><p>Suivez vos invités et modifiez le site, simplement.</p></div>
+    <header className="admin-dashboard-head"><div><div className="eyebrow">{content.heroTitle.trim() || initialContent.heroTitle}</div><h1>Espace organisateurs</h1><p>Suivez vos invités et modifiez le site, simplement.</p></div>
       <div className="row"><Link href="/" className="button secondary small"><ArrowLeft size={16}/> Voir le site</Link><button className="button secondary small" onClick={logout}><LogOut size={16}/> Me déconnecter</button></div>
     </header>
     <div className="admin-dashboard-grid"><aside className="admin-menu"><div className="admin-menu-label">MENU</div>
@@ -156,10 +156,11 @@ export default function AdminPage() {
           <article className="admin-stat"><span>Ne viennent pas</span><strong>{summary.declined}</strong><small><UserX size={14}/> ont dit non</small></article></div>
         <div className="admin-panel"><h3>Ce qu’il reste à faire</h3>
           <ul className="admin-todo">{todos.length===0?<li className="ok"><span>Tout est à jour. Rien à faire pour le moment.</span></li>:todos.map(t=><li key={t.text}><span>{t.text}</span><button className="button secondary small" onClick={()=>{if(t.filter)setFilter(t.filter);setTab(t.tab);}}>{t.action}</button></li>)}</ul></div>
-        <div className="admin-panel"><h3>Accès rapide</h3><div className="admin-shortcuts"><button onClick={()=>{setFilter('all');setTab('guests');}}><Users/> Voir qui vient</button><button onClick={()=>setTab('announcement')}><Megaphone/> Écrire un message aux invités</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('event')}><MapPin/> Modifier la date ou le lieu</button></div></div>
+        <div className="admin-panel"><h3>Accès rapide</h3><div className="admin-shortcuts"><button onClick={()=>{setFilter('all');setTab('guests');}}><Users/> Voir qui vient</button><button onClick={()=>setTab('announcement')}><Megaphone/> Écrire un message aux invités</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('event')}><MapPin/> Modifier le titre, la date ou le lieu</button></div></div>
         <div className="admin-panel"><h3>Ce que vos invités voient</h3><p><b>Date :</b> {eventDay} à {content.eventTime}</p><p><b>Lieu :</b> {content.venue}, {content.venueDetail}</p></div></>}
 
       {tab==='event'&&<div className="admin-panel"><h3>Informations de la cérémonie</h3><p className="admin-muted">Ces informations seront publiées sur l’invitation après enregistrement.</p><div className="admin-form-grid">
+        <div className="admin-full"><label>Titre principal du site</label><input value={content.heroTitle} maxLength={80} onChange={e=>field('heroTitle',e.target.value)} placeholder="Ex. : Deux peuples pour une union sacrée"/><small className="admin-muted">C’est la grande phrase affichée en haut du site, juste sous « Une célébration de famille ».</small></div>
         <div><label>Date</label><input type="date" value={content.eventDate} onChange={e=>field('eventDate',e.target.value)}/></div><div><label>Heure</label><input type="time" value={content.eventTime} onChange={e=>field('eventTime',e.target.value)}/></div>
         <div><label>Nom du futur marié</label><input value={content.groomName} onChange={e=>field('groomName',e.target.value)}/></div><div><label>Nom de la future mariée</label><input value={content.brideName} onChange={e=>field('brideName',e.target.value)}/></div>
         <div className="admin-full"><label>Noms des familles</label><input value={content.familyNames} onChange={e=>field('familyNames',e.target.value)}/></div>

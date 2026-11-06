@@ -212,3 +212,5 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .admin-warn svg{margin-top:3px;flex-shrink:0}
 .admin-guest-list .admin-empty{border:1px dashed #cfdbe6;border-radius:12px}
 @media(max-width:760px){.admin-hero-stat{padding:20px}.admin-hero-stat strong{font-size:54px}.admin-stat-grid.three .admin-stat{padding:11px}.admin-stat-grid.three .admin-stat strong{font-size:26px}.admin-todo li{align-items:flex-start;flex-direction:column}.admin-menu button{font-size:14px;padding:11px 13px}.admin-guest-card{padding:14px}}
+
+h1.serif{text-wrap:balance;overflow-wrap:anywhere}

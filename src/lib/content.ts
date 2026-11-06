@@ -2,6 +2,7 @@ export type Item = { id: string; title: string; detail: string; confirmed: boole
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type Content = {
+  heroTitle: string;
   pagne: PagneContent;
   announcement: string;
   items: Item[];
@@ -18,6 +19,7 @@ export type Content = {
 };
 
 export const initialContent: Content = {
+  heroTitle: 'Deux peuples pour une union sacrée',
   pagne: {
     enabled: true,
     price: 2500,
