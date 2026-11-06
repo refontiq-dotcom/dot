@@ -238,3 +238,26 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 
 .travel-steps>li.travel-alt{margin-top:4px;padding-top:16px;border-top:1px dashed #cfdbe6}
 .travel-steps>li.travel-alt::before{content:'+';background:#8a98a6}
+
+/* Animations douces du guide de trajet */
+@keyframes travel-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes travel-slide{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+@keyframes travel-line{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes travel-pop{0%{transform:scale(.7)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes travel-pulse{0%{box-shadow:0 0 0 0 rgba(212,160,60,.6)}70%{box-shadow:0 0 0 12px rgba(212,160,60,0)}100%{box-shadow:0 0 0 0 rgba(212,160,60,0)}}
+.travel-card{animation:travel-in .6s ease both}
+.travel-steps>li{animation:travel-in .5s ease both}
+.travel-steps>li:nth-child(1){animation-delay:.05s}
+.travel-steps>li:nth-child(2){animation-delay:.25s}
+.travel-steps>li:nth-child(3){animation-delay:.45s}
+.travel-steps>li:nth-child(4){animation-delay:.65s}
+.travel-steps>li:not(:last-child)::after{content:'';position:absolute;left:16px;top:40px;bottom:-14px;width:2px;background:linear-gradient(var(--accent),#cfdbe6);transform-origin:top;animation:travel-line .6s ease both;animation-delay:.4s}
+.travel-lines li{animation:travel-slide .45s ease both;animation-delay:calc(var(--i,0)*90ms + 200ms)}
+.travel-stop svg{box-sizing:content-box;padding:9px;border-radius:50%;background:#fbeccb;animation:travel-pulse 2.4s ease-out infinite}
+.travel-modes button{transition:transform .15s ease,background .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease}
+.travel-modes button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(11,47,115,.14)}
+.travel-modes button:active{transform:scale(.97)}
+.travel-modes button[aria-pressed=true] svg{animation:travel-pop .4s ease}
+.travel-steps .button{transition:transform .15s ease,box-shadow .2s ease}
+.travel-steps .button:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(11,47,115,.2)}
+@media(prefers-reduced-motion:reduce){.travel-card,.travel-steps>li,.travel-steps>li::after,.travel-lines li,.travel-stop svg,.travel-modes button svg{animation:none!important}.travel-modes button,.travel-steps .button{transition:none}.travel-modes button:hover,.travel-steps .button:hover{transform:none}}

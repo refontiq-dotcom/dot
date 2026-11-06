@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Bus, Car, CarTaxiFront, MapPinned, Navigation } from 'lucide-react';
 import type { TravelContent } from '@/lib/content';
 
@@ -38,12 +38,12 @@ export default function TravelGuide({ travel, mapUrl }: { travel: TravelContent;
         </div>
 
         {mode === 'bus' && (
-          <ol className="travel-steps">
+          <ol className="travel-steps" key={mode}>
             <li>
               <h4>Prenez l’un de ces bus</h4>
               <ul className="travel-lines">
-                {lines.map(line => (
-                  <li key={line.id}>
+                {lines.map((line, index) => (
+                  <li key={line.id} style={{ '--i': index } as CSSProperties}>
                     <span className="travel-badge" aria-label={`Ligne ${line.number}`}>{line.number}</span>
                     <span className="travel-line-text">
                       <span><b>Départ :</b> {line.from || 'à confirmer'}</span>
@@ -66,7 +66,7 @@ export default function TravelGuide({ travel, mapUrl }: { travel: TravelContent;
         )}
 
         {mode === 'taxi' && (
-          <ol className="travel-steps">
+          <ol className="travel-steps" key={mode}>
             <li>
               <h4>Prenez un taxi depuis ce point</h4>
               <div className="travel-stop"><MapPinned size={22} /><div><strong>{travel.taxiFrom}</strong><small>Point de départ conseillé.</small></div></div>
@@ -90,7 +90,7 @@ export default function TravelGuide({ travel, mapUrl }: { travel: TravelContent;
         )}
 
         {mode === 'car' && (
-          <ol className="travel-steps">
+          <ol className="travel-steps" key={mode}>
             <li>
               <h4>Ouvrez l’itinéraire</h4>
               <p>Touchez le bouton ci-dessous : Google Maps vous guide depuis votre position.</p>

@@ -34,7 +34,7 @@ export const initialContent: Content = {
       { id: 'bus-82', number: '82', from: 'Gare Sud (Plateau)', to: '' },
       { id: 'bus-90', number: '90', from: 'Cocody Blockhaus', to: '' },
       { id: 'bus-719', number: '719', from: 'Yopougon Saint-André', to: 'Cocody Terminus 81-82' },
-      { id: 'bus-775', number: '775', from: 'Gare de Passam (Fraîcheville)', to: 'Angré Château (Cocody)' },
+      { id: 'bus-775', number: '775', from: 'Gare de Bassam (Treichville)', to: 'Angré Château (Cocody)' },
       { id: 'bus-704', number: '704', from: 'Saint-Jean (Cocody)', to: 'Angré Château' },
     ],
   },
