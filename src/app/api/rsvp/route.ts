@@ -8,6 +8,7 @@ import {
   validateGuestName,
 } from '@/lib/rsvp';
 import {
+  NO_STORE,
   RATE_LIMITS,
   clientIp,
   detectDuplicateNames,
@@ -15,6 +16,7 @@ import {
   hashIp,
   isRateLimited,
   recordRateEvent,
+  requestOriginAllowed,
 } from '@/lib/rsvp-server';
 
 export const runtime = 'nodejs';
@@ -25,9 +27,9 @@ type RsvpPayload = {
   attending?: unknown;
   companions?: unknown;
   website?: unknown;
+  mode?: unknown;
+  originalGuestName?: unknown;
 };
-
-const NO_STORE = { 'Cache-Control': 'no-store' };
 
 function json(payload: Record<string, unknown>, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE });
@@ -35,16 +37,6 @@ function json(payload: Record<string, unknown>, status = 200) {
 
 function jsonError(message: string, status: number, code?: string) {
   return json({ error: message, ...(code ? { code } : {}) }, status);
-}
-
-function requestOriginAllowed(request: NextRequest): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return false;
-  try {
-    return new URL(origin).origin === request.nextUrl.origin;
-  } catch {
-    return false;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -97,7 +89,25 @@ export async function POST(request: NextRequest) {
     return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
   }
 
-  // Même numéro = même inscription : le serveur met à jour la réponse existante.
+  // Modification d'une réponse existante : il faut connaître le numéro ET le nom d'origine.
+  const updating = body.mode === 'update';
+  if (updating) {
+    const originalKey = typeof body.originalGuestName === 'string' ? normalizeNameKey(cleanPersonName(body.originalGuestName)) : '';
+    const { data: existing, error: lookupError } = await supabase
+      .from('rsvp_responses')
+      .select('guest_name')
+      .eq('phone_normalized', phone.normalized)
+      .maybeSingle();
+    if (lookupError) {
+      console.error('Dot RSVP lookup failed:', lookupError.message);
+      return jsonError('Votre réponse n’a pas pu être enregistrée. Veuillez réessayer.', 500);
+    }
+    if (!existing || !originalKey || normalizeNameKey(String(existing.guest_name)) !== originalKey) {
+      return jsonError('Nous ne trouvons pas votre réponse avec ce nom et ce numéro.', 404, 'not_found');
+    }
+  }
+
+  // Même numéro = même inscription, mais on ne la modifie que sur demande explicite (mode « update »).
   const nameKeys = [normalizeNameKey(guestName), ...companions.keys].filter(Boolean);
   const possibleDuplicate = await detectDuplicateNames(supabase, nameKeys, phone.normalized);
 
@@ -108,10 +118,17 @@ export async function POST(request: NextRequest) {
     p_attending: attending,
     p_companion_names: companions.names,
     p_companion_name_keys: companions.keys,
+    p_allow_update: updating,
   });
 
   if (error) {
     const message = error.message ?? '';
+    if (message.includes('already_registered')) {
+      return jsonError('Vous êtes déjà sur la liste des invités. Pour changer votre réponse, touchez « Modifier ma réponse ».', 409, 'already_registered');
+    }
+    if (message.includes('companions_limit')) {
+      return jsonError('Vous ne pouvez pas ajouter de proches en plus de ceux déjà indiqués. Pour une demande particulière, contactez les familles.', 409, 'companions_limit');
+    }
     if (message.includes('duplicate_companion')) {
       return jsonError('Le même proche est indiqué deux fois.', 400, 'invalid_companions');
     }

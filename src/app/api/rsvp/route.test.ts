@@ -119,3 +119,23 @@ describe('POST /api/rsvp — inscription simple, sans compte', () => {
     expect(response.status).toBe(503);
   });
 });
+
+describe('POST /api/rsvp — modification d’une réponse', () => {
+  it('valide les données avant de traiter une modification', async () => {
+    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi', phone: '0912345678' })));
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe('invalid_phone');
+  });
+
+  it('refuse toujours des proches pour une absence, même en modification', async () => {
+    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi', attending: false, companions: ['Jean Kouassi'] })));
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe('invalid_companions');
+  });
+
+  it('signale l’indisponibilité du service pour une modification', async () => {
+    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi' })));
+    expect(response.status).toBe(503);
+  });
+});
+

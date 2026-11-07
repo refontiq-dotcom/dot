@@ -17,6 +17,7 @@ import {
   Phone,
   MessageCircle,
   Lock,
+  Pencil,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
@@ -47,6 +48,10 @@ export default function Home() {
   const [rsvpReceipt, setRsvpReceipt] = useState<RsvpReceipt | null>(null);
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editOriginalName, setEditOriginalName] = useState('');
+  const [maxCompanions, setMaxCompanions] = useState(9);
+  const [lookupBusy, setLookupBusy] = useState(false);
   const [showTravelGuide, setShowTravelGuide] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -205,10 +210,55 @@ export default function Home() {
     setPendingRemoval(null);
     setWebsite('');
     setRsvpStatus('');
+    setEditMode(false);
+    setEditOriginalName('');
+    setMaxCompanions(9);
   }
 
-  function changeCompanionCount(nextCount: number) {
+  // Retrouve la réponse de l'invité (nom + numéro) pour la modifier.
+  async function startEdit() {
     setRsvpStatus('');
+    const parsed = normalizeIvorianPhone(phone);
+    if (!parsed.ok) {
+      setRsvpStatus(parsed.error);
+      return;
+    }
+    if (guestName.trim().length < 2) {
+      setRsvpStatus('Indiquez votre nom et prénom, comme lors de votre première réponse.');
+      return;
+    }
+    setLookupBusy(true);
+    try {
+      const response = await fetch('/api/rsvp/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestName, phone: parsed.normalized }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Réponse introuvable.');
+      const found: string[] = Array.isArray(result.companions) ? result.companions.map(String) : [];
+      setEditMode(true);
+      setEditOriginalName(String(result.guestName));
+      setGuestName(String(result.guestName));
+      setPhone(parsed.display);
+      setAttending(result.attending ? 'yes' : 'no');
+      setCompanions(result.attending ? found : []);
+      setMaxCompanions(Math.max(Number(result.maxCompanions) || 0, found.length));
+      setPendingRemoval(null);
+    } catch (error) {
+      setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
+    } finally {
+      setLookupBusy(false);
+    }
+  }
+
+  function cancelEdit() {
+    resetRsvpForm();
+  }
+
+  function changeCompanionCount(requested: number) {
+    setRsvpStatus('');
+    const nextCount = editMode ? Math.min(requested, maxCompanions) : requested;
     if (nextCount === companions.length) return;
     if (nextCount > companions.length) {
       setCompanions(previous => [...previous, ...Array.from({ length: nextCount - previous.length }, () => '')]);
@@ -283,6 +333,7 @@ export default function Home() {
           attending: attendingYes,
           companions: attendingYes ? companionNames : [],
           website,
+          ...(editMode ? { mode: 'update', originalGuestName: editOriginalName } : {}),
         }),
       });
       const result = await response.json();
@@ -476,6 +527,12 @@ export default function Home() {
               <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
             </div>
             <form className="rsvp-form" onSubmit={submitRsvp} data-reveal>
+              {editMode && (
+                <div className="rsvp-edit-banner" role="status">
+                  <b>Vous modifiez votre réponse</b>
+                  <p>Vous pouvez corriger les noms, réduire le nombre de proches ou indiquer que vous ne viendrez pas. Il n’est pas possible d’ajouter des proches.</p>
+                </div>
+              )}
               <label htmlFor="guest-name">Votre nom et prénom</label>
               <input id="guest-name" name="guestName" autoComplete="name" maxLength={120} required value={guestName} onChange={event => setGuestName(event.target.value)} placeholder="Ex. : Marie Kouassi" />
 
@@ -489,6 +546,7 @@ export default function Home() {
                 maxLength={24}
                 required
                 value={phone}
+                readOnly={editMode}
                 onChange={event => setPhone(event.target.value)}
                 placeholder="Ex. : 07 00 00 00 00"
               />
@@ -509,12 +567,13 @@ export default function Home() {
                   <label htmlFor="companion-count">Qui vient avec vous ?</label>
                   <p className="rsvp-hint">Famille, conjoint(e), enfants : vous êtes les bienvenus. Dites-nous simplement combien vous serez.</p>
                   <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
-                    {Array.from({ length: 10 }, (_, index) => index).map(count => (
+                    {Array.from({ length: (editMode ? maxCompanions : 9) + 1 }, (_, index) => index).map(count => (
                       <option key={count} value={count}>
                         {count === 0 ? 'Je viens seul(e)' : `${count} proche${count > 1 ? 's' : ''} avec moi`}
                       </option>
                     ))}
                   </select>
+                  {editMode && <p className="rsvp-hint">{maxCompanions > 0 ? `Vous pouvez réduire le nombre de proches, mais pas en ajouter (maximum : ${maxCompanions}).` : 'Il n’est pas possible d’ajouter des proches à cette réponse. Contactez les familles si besoin.'}</p>}
                   {companions.map((companion, index) => (
                     <div key={index}>
                       <label htmlFor={`companion-${index}`}>Nom de votre proche n°{index + 1}</label>
@@ -557,9 +616,19 @@ export default function Home() {
                 <label htmlFor="rsvp-website">Ne pas remplir ce champ</label>
                 <input id="rsvp-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
               </div>
-              <button className="button" type="submit" disabled={rsvpBusy}>
-                {rsvpBusy ? 'Envoi en cours…' : 'Envoyer ma réponse'}
-              </button>
+              <div className="rsvp-buttons">
+                <button className="button" type="submit" disabled={rsvpBusy || lookupBusy}>
+                  {rsvpBusy ? 'Envoi en cours…' : editMode ? 'Enregistrer mes modifications' : 'Envoyer ma réponse'}
+                </button>
+                {editMode ? (
+                  <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>
+                ) : (
+                  <button className="button secondary" type="button" onClick={() => void startEdit()} disabled={rsvpBusy || lookupBusy}>
+                    <Pencil size={17} /> {lookupBusy ? 'Recherche…' : 'Modifier ma réponse'}
+                  </button>
+                )}
+              </div>
+              {!editMode && <p className="rsvp-hint">Déjà répondu ? Entrez votre nom et votre numéro, puis touchez « Modifier ma réponse ».</p>}
               {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
               <p className="rsvp-privacy">Votre numéro et votre réponse restent privés.</p>
             </form>
@@ -617,12 +686,12 @@ export default function Home() {
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
               {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.updated ? 'Vous êtes déjà sur la liste des invités' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
             {rsvpReceipt.attending ? (
               <>
                 <p id="rsvp-modal-text">
-                  {rsvpReceipt.updated ? 'Nous avons bien mis votre réponse à jour.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
+                  {rsvpReceipt.updated ? 'Nous avons bien enregistré vos modifications.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
                   {rsvpReceipt.companionCount > 0
                     ? `Vos ${rsvpReceipt.personCount} places sont réservées (vous et ${rsvpReceipt.companionCount} proche${rsvpReceipt.companionCount > 1 ? 's' : ''}).`
                     : 'Votre place est réservée.'}
@@ -652,7 +721,7 @@ export default function Home() {
             ) : (
               <>
                 <p id="rsvp-modal-text">
-                  {rsvpReceipt.updated ? 'Nous avons bien mis votre réponse à jour.' : 'Votre réponse a bien été transmise aux familles.'} Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
+                  {rsvpReceipt.updated ? 'Nous avons bien enregistré vos modifications.' : 'Votre réponse a bien été transmise aux familles.'} Vous nous manquerez — nous penserons à vous le {formattedEventDate}.
                 </p>
                 {rsvpReceipt.possibleDuplicate && (
                   <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>

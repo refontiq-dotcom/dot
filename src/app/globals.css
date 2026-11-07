@@ -358,3 +358,11 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 .admin-edit-card-head{gap:10px}
 
 .admin-family-tag{margin-left:8px;display:inline-block;background:#ece6f5;color:#4a3a78;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:800;vertical-align:middle}
+
+/* Modification d'une réponse */
+.rsvp-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.rsvp-buttons .button{flex:1 1 200px;justify-content:center}
+.rsvp-edit-banner{background:#eef5fb;border:1px solid #cfdbe6;border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.rsvp-edit-banner b{display:block;color:var(--deep);margin-bottom:4px}
+.rsvp-edit-banner p{margin:0;font-size:15px}
+.rsvp-form input[readonly]{background:#f2f5f8;color:#5c6b7a}

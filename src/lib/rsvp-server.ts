@@ -1,11 +1,25 @@
 // Utilitaires serveur uniquement : ne jamais importer ce module depuis un composant client.
 import { createHash } from 'node:crypto';
+import type { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { normalizeNameKey } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
 } as const;
+
+export const NO_STORE = { 'Cache-Control': 'no-store' };
+
+/** Les requêtes doivent venir du site lui-même (même origine). */
+export function requestOriginAllowed(request: NextRequest): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return false;
+  try {
+    return new URL(origin).origin === request.nextUrl.origin;
+  } catch {
+    return false;
+  }
+}
 
 /** Client service_role : toutes les écritures RSVP passent par lui. */
 export function getAdminClient(): SupabaseClient | null {
