@@ -23,6 +23,7 @@ import {
 import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
 import ProgramTimeline from '@/components/ProgramTimeline';
+import InstallApp from '@/components/InstallApp';
 import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
@@ -420,7 +421,10 @@ export default function Home() {
                 <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
                 <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
-              <a className="hero-link" href="#programme"><ListChecks size={17} /> Voir le programme de la journée</a>
+              <div className="hero-links">
+                <a className="hero-link" href="#programme"><ListChecks size={17} /> Voir le programme de la journée</a>
+                <InstallApp />
+              </div>
             </div>
           </div>
         </section>
