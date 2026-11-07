@@ -429,7 +429,7 @@ export default function Home() {
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
               <p style={{ color: 'var(--muted)' }}>Voici le déroulé complet de la journée. Les horaires peuvent légèrement évoluer : revenez consulter cette page.</p>
-              <ProgramTimeline items={content.items} />
+              <ProgramTimeline items={content.items.filter(item => !item.familyOnly)} />
             </div>
             <div className="card program-aside" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
               <div className="iconbox"><Clock3 /></div>

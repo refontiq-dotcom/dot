@@ -1,4 +1,4 @@
-export type Item = { id: string; title: string; detail: string; confirmed: boolean; timeBegin?: string; timeEnd?: string; phase?: string; highlight?: boolean };
+export type Item = { id: string; title: string; detail: string; confirmed: boolean; timeBegin?: string; timeEnd?: string; phase?: string; highlight?: boolean; familyOnly?: boolean };
 export type PagneContact = { id: string; label: string; phone: string };
 export type PagneContent = { enabled: boolean; price: number; description: string; imageUrl: string; contacts: PagneContact[] };
 export type BusLine = { id: string; number: string; from: string; to: string };
@@ -48,11 +48,11 @@ export const initialContent: Content = {
   },
   announcement: 'Bienvenue sur votre espace famille. Les prochaines informations seront partagées ici.',
   items: [
-    { id: 'step-1', timeBegin: '06:00', timeEnd: '08:00', phase: 'Matinée en famille', title: 'Préparation et mise en beauté', detail: 'Maquillage professionnel et coiffure de la mariée à domicile.', highlight: false, confirmed: true },
-    { id: 'step-2', timeBegin: '08:00', timeEnd: '08:30', phase: 'Matinée en famille', title: 'Mise en place logistique', detail: 'Ajustement final de la sonorisation, nappage des tables et disposition des chaises.', highlight: false, confirmed: true },
-    { id: 'step-3', timeBegin: '08:30', timeEnd: '09:00', phase: 'Matinée en famille', title: 'Rassemblement des familles', detail: 'Arrivée de la délégation du marié. Accueil discret et séparation initiale des deux familles.', highlight: false, confirmed: true },
-    { id: 'step-4', timeBegin: '09:00', timeEnd: '11:00', phase: 'Matinée en famille', title: 'Cérémonie traditionnelle de la dot', detail: 'Libations, négociation des porte-paroles, vérification des présents de la dot et bénédiction des patriarches.', highlight: true, confirmed: true },
-    { id: 'step-5', timeBegin: '11:00', timeEnd: '11:30', phase: 'Matinée en famille', title: 'Séance photo officielle en famille', detail: 'Prise de vue exclusive avec les parents et les témoins avant l’effervescence du public.', highlight: false, confirmed: true },
+    { id: 'step-1', timeBegin: '06:00', timeEnd: '08:00', phase: 'Matinée en famille', title: 'Préparation et mise en beauté', detail: 'Maquillage professionnel et coiffure de la mariée à domicile.', highlight: false, familyOnly: true, confirmed: true },
+    { id: 'step-2', timeBegin: '08:00', timeEnd: '08:30', phase: 'Matinée en famille', title: 'Mise en place logistique', detail: 'Ajustement final de la sonorisation, nappage des tables et disposition des chaises.', highlight: false, familyOnly: true, confirmed: true },
+    { id: 'step-3', timeBegin: '08:30', timeEnd: '09:00', phase: 'Matinée en famille', title: 'Rassemblement des familles', detail: 'Arrivée de la délégation du marié. Accueil discret et séparation initiale des deux familles.', highlight: false, familyOnly: true, confirmed: true },
+    { id: 'step-4', timeBegin: '09:00', timeEnd: '11:00', phase: 'Matinée en famille', title: 'Cérémonie traditionnelle de la dot', detail: 'Libations, négociation des porte-paroles, vérification des présents de la dot et bénédiction des patriarches.', highlight: true, familyOnly: true, confirmed: true },
+    { id: 'step-5', timeBegin: '11:00', timeEnd: '11:30', phase: 'Matinée en famille', title: 'Séance photo officielle en famille', detail: 'Prise de vue exclusive avec les parents et les témoins avant l’effervescence du public.', highlight: false, familyOnly: true, confirmed: true },
     { id: 'step-6', timeBegin: '11:30', timeEnd: '11:45', phase: 'Accueil des invités', title: 'Installation du public et ouverture', detail: 'Accueil et placement des invités (voisins, collègues, amis) sous les grandes bâches.', highlight: false, confirmed: true },
     { id: 'step-7', timeBegin: '11:45', timeEnd: '12:15', phase: 'Accueil des invités', title: 'Prière et lancement du buffet', detail: 'Bénédiction solennelle de la nourriture par le Pasteur ou le Prêtre. Ouverture des boissons.', highlight: false, confirmed: true },
     { id: 'step-8', timeBegin: '12:15', timeEnd: '13:00', phase: 'Accueil des invités', title: 'Service des entrées', detail: 'Distribution des rafraîchissements (jus locaux, eau, bières) et amuse-bouches.', highlight: false, confirmed: true },
@@ -114,7 +114,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
     async get() {
       const [siteResult, programResult, faqResult] = await Promise.all([
         supabase.from('site_content').select('key, value, updated_at').in('key', ['content', 'announcement', 'whatsapp']),
-        supabase.from('program_items').select('id, title, detail, confirmed, sort_order, time_begin, time_end, phase, highlight, updated_at').order('sort_order', { ascending: true }),
+        supabase.from('program_items').select('id, title, detail, confirmed, sort_order, time_begin, time_end, phase, highlight, family_only, updated_at').order('sort_order', { ascending: true }),
         supabase.from('faq_items').select('id, question, answer, confirmed, sort_order, updated_at').order('sort_order', { ascending: true }),
       ]);
       if (siteResult.error) throw siteResult.error;
@@ -141,7 +141,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
         announcement: value.announcement ?? legacyAnnouncement?.text ?? initialContent.announcement,
         refoWhatsApp: value.refoWhatsApp ?? legacyWhatsApp?.number ?? initialContent.refoWhatsApp,
         items: Array.isArray(programResult.data)
-          ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed, timeBegin: item.time_begin ?? '', timeEnd: item.time_end ?? '', phase: item.phase ?? '', highlight: item.highlight === true }))
+          ? programResult.data.map(item => ({ id: item.id, title: item.title, detail: item.detail ?? '', confirmed: item.confirmed, timeBegin: item.time_begin ?? '', timeEnd: item.time_end ?? '', phase: item.phase ?? '', highlight: item.highlight === true, familyOnly: item.family_only === true }))
           : (value.items ?? initialContent.items),
         faq: Array.isArray(faqResult.data)
           ? faqResult.data.map(item => ({ id: item.id, title: item.question, detail: item.answer, confirmed: item.confirmed }))
@@ -201,7 +201,7 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       await syncItems('program_items', items, (item, sortOrder) => ({
         title: item.title, detail: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
         time_begin: item.timeBegin?.trim() || null, time_end: item.timeEnd?.trim() || null,
-        phase: item.phase?.trim() || null, highlight: item.highlight === true,
+        phase: item.phase?.trim() || null, highlight: item.highlight === true, family_only: item.familyOnly === true,
       }));
       await syncItems('faq_items', faq, (item, sortOrder) => ({
         question: item.title, answer: item.detail, confirmed: item.confirmed, sort_order: sortOrder,
