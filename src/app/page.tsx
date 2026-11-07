@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Lock,
   Pencil,
+  ListChecks,
 } from 'lucide-react';
 import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
@@ -102,7 +103,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    const sections = ['accueil', 'annonces', 'lieu', 'rsvp', 'faq']
+    const sections = ['accueil', 'annonces', 'programme', 'lieu', 'rsvp', 'faq']
       .map(id => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) return;
@@ -419,6 +420,7 @@ export default function Home() {
                 <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
                 <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
+              <a className="hero-link" href="#programme"><ListChecks size={17} /> Voir le programme de la journée</a>
             </div>
           </div>
         </section>
@@ -672,6 +674,7 @@ export default function Home() {
 
       <nav className="mobile-nav" aria-label="Navigation rapide">
         <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
+        <a href="#programme" aria-current={activeSection === 'programme' ? 'location' : undefined}><ListChecks /><span>Programme</span></a>
         <a href="#lieu" aria-current={activeSection === 'lieu' ? 'location' : undefined}><MapPin /><span>Lieu</span></a>
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>

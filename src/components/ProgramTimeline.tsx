@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Star } from 'lucide-react';
 import type { Item } from '@/lib/content';
-import { formatRange, groupProgram } from '@/lib/program';
+import { formatClock, groupProgram } from '@/lib/program';
 
 export default function ProgramTimeline({ items }: { items: Item[] }) {
   const root = useRef<HTMLDivElement>(null);
@@ -32,13 +32,18 @@ export default function ProgramTimeline({ items }: { items: Item[] }) {
     <div className="program" ref={root}>
       {groups.map((group, g) => (
         <section className="program-group" key={`${group.phase}-${g}`}>
-          {group.phase && <h3 className="program-phase">{group.phase}</h3>}
+          {group.phase && <h3 className="program-phase"><span className="program-phase-label">{group.phase}</span></h3>}
           <ol className="program-steps">
             {group.items.map(item => {
-              const range = formatRange(item.timeBegin, item.timeEnd);
+              const start = formatClock(item.timeBegin);
+              const end = formatClock(item.timeEnd);
+              const spoken = start && end && start !== end ? `de ${start} à ${end}` : start;
               return (
                 <li className={`program-step${item.highlight ? ' is-key' : ''}`} key={item.id}>
-                  <span className="program-time">{range || '—'}</span>
+                  <span className="program-time" aria-label={spoken || undefined}>
+                    <span className="program-time-start" aria-hidden={spoken ? 'true' : undefined}>{start || '—'}</span>
+                    {end && end !== start && <span className="program-time-end" aria-hidden="true">→ {end}</span>}
+                  </span>
                   <div className="program-body">
                     <h4>
                       {item.title}
