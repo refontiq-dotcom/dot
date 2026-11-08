@@ -134,7 +134,6 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
         venue: '',
         venueDetail: '',
         mapUrl: '',
-        travel: initialContent.travel,
         updatedAt,
         pagne: { ...initialContent.pagne, ...(value.pagne ?? {}) },
         travel: initialContent.travel,
