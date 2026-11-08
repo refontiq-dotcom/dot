@@ -102,7 +102,6 @@ export default function AdminPage() {
   }
   function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
   const acceptedGuests=guests.filter(g=>g.attendance_status ? g.attendance_status==='accepted' : g.confirmed);
-  const declinedGuests=guests.filter(g=>g.attendance_status ? g.attendance_status==='declined' : !g.confirmed);
   const waitlistedGuests=guests.filter(g=>g.attendance_status==='waitlisted');
   const summary=useMemo(()=>summarizeGuests(acceptedGuests),[acceptedGuests]);
   const closeOnes=Math.max(summary.expectedPeople-summary.attending,0);
