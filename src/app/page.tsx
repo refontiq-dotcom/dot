@@ -33,6 +33,7 @@ type RsvpReceipt = {
   personCount: number;
   updated: boolean;
   possibleDuplicate: boolean;
+  status: 'accepted' | 'waitlisted' | 'declined';
 };
 
 function Calendar() {
@@ -350,9 +351,10 @@ export default function Home() {
         personCount: typeof result.personCount === 'number' ? result.personCount : 1,
         updated: Boolean(result.updated),
         possibleDuplicate: Boolean(result.possibleDuplicate),
+        status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
       });
 
-      const travelGuideUnlocked = attendingYes;
+      const travelGuideUnlocked = attendingYes && result.status === 'accepted';
       setShowTravelGuide(travelGuideUnlocked);
       try {
         if (travelGuideUnlocked) {
@@ -695,7 +697,13 @@ export default function Home() {
             </div>
             <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
-            {rsvpReceipt.attending ? (
+            {rsvpReceipt.status === 'waitlisted' ? (
+              <>
+                <p id="rsvp-modal-text">Merci pour votre réponse. Les familles vous communiqueront les informations pratiques dès que possible.</p>
+                <p className="modal-note">Nous avons bien enregistré votre demande.</p>
+                <div className="modal-actions"><button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button></div>
+              </>
+            ) : rsvpReceipt.attending ? (
               <>
                 <p id="rsvp-modal-text">
                   {rsvpReceipt.updated ? 'Nous avons bien enregistré vos modifications.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
