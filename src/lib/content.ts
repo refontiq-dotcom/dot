@@ -149,7 +149,8 @@ async function getSupabaseRepository(): Promise<ContentRepository> {
       };
     },
     async set(content) {
-      const { items, faq, updatedAt, ...siteValues } = content;
+      const { items, faq, updatedAt, venue, venueDetail, mapUrl, travel, ...siteValues } = content;
+      void venue; void venueDetail; void mapUrl; void travel;
       void updatedAt;
       // site_content.key has a UNIQUE constraint in the live schema, so this upsert is valid.
       // Legacy announcement and whatsapp rows are left untouched.
