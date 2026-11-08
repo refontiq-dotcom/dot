@@ -50,10 +50,14 @@ export async function POST(request: NextRequest) {
   if (!supabase) return jsonError('Le service de confirmation est momentanément indisponible.', 503, 'unavailable');
 
   const ipHash = hashIp(clientIp(request.headers));
-  if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.lookupPerHourPerIp })) {
-    return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
+  try {
+    if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.lookupPerHourPerIp })) {
+      return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
+    }
+    await recordRateEvent(supabase, ipHash);
+  } catch {
+    return jsonError('Le service est momentanément indisponible. Veuillez réessayer plus tard.', 503, 'rate_limit_unavailable');
   }
-  await recordRateEvent(supabase, ipHash);
 
   const { data: rows, error } = await supabase
     .from('rsvp_responses')
@@ -80,7 +84,10 @@ export async function POST(request: NextRequest) {
     return jsonError('Votre réponse n’a pas pu être retrouvée. Veuillez réessayer.', 500);
   }
 
-  const status = row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined');
+  const rawStatus = row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined');
+  const status = rawStatus === 'accepted' || rawStatus === 'waitlisted' || rawStatus === 'declined' || rawStatus === 'review'
+    ? rawStatus
+    : 'review';
   let venueDetails: Record<string, unknown> | null = null;
   if (status === 'accepted') {
     const { data: details, error: detailsError } = await supabase
