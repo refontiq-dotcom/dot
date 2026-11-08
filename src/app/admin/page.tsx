@@ -11,9 +11,9 @@ const ADMIN_EMAIL = 'refontiq@gmail.com';
 const plain = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const phoneDigits = (phone: string) => { const d = phone.replace(/\D/g, ''); return d.length === 10 ? `225${d}` : d; };
 type Companion = { id: string; full_name: string; position: number };
-type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
-type GuestFilter = 'all' | 'yes' | 'no' | 'check';
-type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
+type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; attendance_status?: 'accepted' | 'waitlisted' | 'declined'; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
+type GuestFilter = 'all' | 'yes' | 'no' | 'waitlisted' | 'check';
+type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; status: 'accepted' | 'waitlisted' | 'declined'; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
 type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
@@ -31,7 +31,7 @@ export default function AdminPage() {
   },[]);
   const refresh=useCallback(async()=>{
     setLoading(true);setNotice('');
-    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false})]);
+    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,attendance_status,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false})]);
       if(r.error)throw r.error;setContent(c);setGuests((r.data??[]) as RSVP[]);
     } catch(e){setNotice(e instanceof Error?e.message:'Chargement impossible.');} finally{setLoading(false);}
   },[]);
@@ -83,13 +83,18 @@ export default function AdminPage() {
     field('pagne',{...content.pagne,contacts:content.pagne.contacts.map((item,i)=>i===index?{...item,...patch}:item)});
   }
   function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
-  const summary=useMemo(()=>summarizeGuests(guests),[guests]);
+  const acceptedGuests=guests.filter(g=>g.attendance_status ? g.attendance_status==='accepted' : g.confirmed);
+  const declinedGuests=guests.filter(g=>g.attendance_status ? g.attendance_status==='declined' : !g.confirmed);
+  const waitlistedGuests=guests.filter(g=>g.attendance_status==='waitlisted');
+  const summary=useMemo(()=>summarizeGuests(acceptedGuests),[acceptedGuests]);
   const closeOnes=Math.max(summary.expectedPeople-summary.attending,0);
+  const acceptedPeople=summary.expectedPeople;
   const groups=useMemo<GuestGroup[]>(()=>{
     const list:GuestGroup[]=guests.map(g=>{
       const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position).map(c=>c.full_name);
       const size=declaredGroupSize(g.person_count,companions.length,g.confirmed);
-      return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:g.confirmed,size,companions,unnamed:g.confirmed?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
+      const status=g.attendance_status??(g.confirmed?'accepted':'declined');
+      return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:status==='accepted',status,size,companions,unnamed:status==='accepted'?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
     });
     // Un nom présent dans deux réponses différentes est signalé, jamais fusionné.
     const owners=new Map<string,Set<string>>();
@@ -97,11 +102,12 @@ export default function AdminPage() {
     return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(n=>{const ids=owners.get(normalizeNameKey(n));return Boolean(ids&&ids.size>1);})}));
   },[guests]);
   const searchTerm=plain(search.trim());
-  const counts={all:groups.length,yes:groups.filter(g=>g.confirmed).length,no:groups.filter(g=>!g.confirmed).length,check:groups.filter(g=>g.duplicates.length>0).length};
+  const counts={all:groups.length,yes:groups.filter(g=>g.status==='accepted').length,no:groups.filter(g=>g.status==='declined').length,waitlisted:groups.filter(g=>g.status==='waitlisted').length,check:groups.filter(g=>g.duplicates.length>0).length};
   const shown=useMemo(()=>groups.filter(g=>{
     if(searchTerm&&![g.name,...g.companions].some(n=>plain(n).includes(searchTerm)))return false;
     if(filter==='yes')return g.confirmed;
-    if(filter==='no')return !g.confirmed;
+    if(filter==='no')return g.status==='declined';
+    if(filter==='waitlisted')return g.status==='waitlisted';
     if(filter==='check')return g.duplicates.length>0;
     return true;
   }),[groups,searchTerm,filter]);
@@ -109,7 +115,7 @@ export default function AdminPage() {
     const day=(v:string)=>new Date(v).toLocaleDateString('fr-FR');
     const rows=[['Nom','Invité ou proche','Venu(e) avec','Téléphone','Réponse','Personnes dans le groupe','Répondu le'],
       ...shown.flatMap(g=>{
-        const answer=g.confirmed?'Présent(e)':'Absent(e)',size=g.confirmed?String(g.size):'0';
+        const answer=g.status==='accepted'?'Présent(e)':g.status==='waitlisted'?'En attente':'Absent(e)',size=g.status==='accepted'?String(g.size):'0';
         return [[g.name,'Invité','',g.phone??'',answer,size,day(g.createdAt)],
           ...g.companions.map(n=>[n,'Proche',g.name,'',answer,size,day(g.createdAt)]),
           ...(g.unnamed>0?[[`${g.unnamed} proche${g.unnamed>1?'s':''} (nom non donné)`,'Proche',g.name,'',answer,size,day(g.createdAt)]]:[])];
@@ -157,11 +163,12 @@ export default function AdminPage() {
       {notice&&<div className="admin-success" role="status">{notice}</div>}
       {tab==='overview'&&<>
         <div className="admin-hero-stat"><span>Personnes attendues le jour J</span><strong>{summary.expectedPeople}</strong>
-          <p>{summary.responses===0?'Aucune réponse pour le moment. Elles apparaîtront ici dès que vos invités confirmeront.':`${plural(summary.attending,'invité','invités')} + ${plural(closeOnes,'proche venu avec eux','proches venus avec eux')}`}</p></div>
+          <p>{summary.attending===0?'Aucune présence acceptée pour le moment.':`${plural(summary.attending,'invité','invités')} + ${plural(closeOnes,'proche venu avec eux','proches venus avec eux')}`}</p></div>
         <div className="admin-stat-grid three">
           <article className="admin-stat"><span>Invités présents</span><strong>{summary.attending}</strong><small><UserCheck size={14}/> ont dit oui</small></article>
           <article className="admin-stat"><span>Proches avec eux</span><strong>{closeOnes}</strong><small><Users size={14}/> famille, amis</small></article>
-          <article className="admin-stat"><span>Ne viennent pas</span><strong>{summary.declined}</strong><small><UserX size={14}/> ont dit non</small></article></div>
+          <article className="admin-stat"><span>En attente</span><strong>{waitlistedGuests.length}</strong><small>réponses reçues</small></article></div>
+        <div className="admin-panel"><h3>Capacité des invités</h3><p><b>{acceptedPeople} / 100</b> places confirmées · {Math.max(100-acceptedPeople,0)} restantes. Les 20 places des organisateurs sont réservées séparément.</p></div>
         <div className="admin-panel"><h3>Ce qu’il reste à faire</h3>
           <ul className="admin-todo">{todos.length===0?<li className="ok"><span>Tout est à jour. Rien à faire pour le moment.</span></li>:todos.map(t=><li key={t.text}><span>{t.text}</span><button className="button secondary small" onClick={()=>{if(t.filter)setFilter(t.filter);setTab(t.tab);}}>{t.action}</button></li>)}</ul></div>
         <div className="admin-panel"><h3>Accès rapide</h3><div className="admin-shortcuts"><button onClick={()=>{setFilter('all');setTab('guests');}}><Users/> Voir qui vient</button><button onClick={()=>setTab('announcement')}><Megaphone/> Écrire un message aux invités</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('event')}><MapPin/> Modifier le titre, la date ou le lieu</button></div></div>
@@ -237,10 +244,10 @@ export default function AdminPage() {
 
       {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Qui vient ?</h3><p className="admin-muted">Chaque carte est un invité, avec les proches qui viennent avec lui.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Télécharger la liste (Excel)</button></div>
         <div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Chercher un nom…" aria-label="Chercher un nom"/></div>
-        <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
+        <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],['waitlisted','En attente',counts.waitlisted],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
         <ul className="admin-guest-list">
           {shown.map(g=>{const digits=g.phone?phoneDigits(g.phone):'';return <li className="admin-guest-card" key={g.id}>
-            <div className="admin-guest-top"><b>{g.name}</b><span className={g.confirmed?'admin-status yes':'admin-status no'}>{g.confirmed?'Vient':'Ne vient pas'}</span></div>
+            <div className="admin-guest-top"><b>{g.name}</b><span className={g.status==='accepted'?'admin-status yes':g.status==='waitlisted'?'admin-status':'admin-status no'}>{g.status==='accepted'?'Vient':g.status==='waitlisted'?'En attente':'Ne vient pas'}</span></div>
             {g.confirmed&&<p className="admin-guest-line"><Users size={16}/><span>{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
             {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> WhatsApp</a></div>}
             {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
