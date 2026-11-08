@@ -80,7 +80,6 @@ export default function Home() {
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [editOriginalName, setEditOriginalName] = useState('');
   const [maxCompanions, setMaxCompanions] = useState(MAX_COMPANIONS);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupPhone, setLookupPhone] = useState('');
@@ -242,7 +241,6 @@ export default function Home() {
     setWebsite('');
     setRsvpStatus('');
     setEditMode(false);
-    setEditOriginalName('');
     setMaxCompanions(MAX_COMPANIONS);
   }
 
@@ -266,7 +264,7 @@ export default function Home() {
         companions: Array.isArray(result.companions) ? result.companions.map(String) : [],
         companionCount: Number(result.companionCount) || 0, personCount: Number(result.personCount) || 0,
         maxCompanions: Number(result.maxCompanions) || 0,
-        status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : result.status === 'review' ? 'review' : 'accepted',
+        status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
         ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
       };
       setLookupResult(found);
@@ -279,7 +277,7 @@ export default function Home() {
   // Ouvre le formulaire de modification existant avec les informations retrouvées.
   function startEdit() {
     if (!lookupResult) return;
-    setRsvpStatus(''); setEditMode(true); setEditOriginalName(lookupResult.guestName);
+    setRsvpStatus(''); setEditMode(true);
     setGuestName(lookupResult.guestName); setPhone(lookupPhone);
     setAttending(lookupResult.attending ? 'yes' : 'no');
     setCompanions(lookupResult.attending ? [...lookupResult.companions] : []);
@@ -367,7 +365,7 @@ export default function Home() {
           attending: attendingYes,
           companions: attendingYes ? companionNames : [],
           website,
-          ...(editMode ? { mode: 'update', originalGuestName: editOriginalName } : {}),
+          ...(editMode ? { mode: 'update' } : {}),
         }),
       });
       const result = await response.json();
@@ -392,7 +390,7 @@ export default function Home() {
         personCount: typeof result.personCount === 'number' ? result.personCount : 1,
         updated: Boolean(result.updated),
         possibleDuplicate: Boolean(result.possibleDuplicate),
-        status: result.status === 'review' ? 'review' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
+        status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
       });
 
       if (editMode) {
@@ -403,7 +401,7 @@ export default function Home() {
           companions: attendingYes ? companionNames : [],
           companionCount: attendingYes ? companionNames.length : 0,
           personCount: typeof result.personCount === 'number' ? result.personCount : (attendingYes ? 1 + companionNames.length : 0),
-          status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : result.status === 'review' ? 'review' : 'accepted',
+          status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
           ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
         } : current);
       }
