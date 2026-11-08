@@ -54,7 +54,7 @@ function pagneWhatsAppUrl(phone: string, guestName: string, personCount: number,
     'Pouvez-vous m’indiquer les modalités de commande et de retrait ?',
     '',
     'Merci.'
-  ].join('\\n');
+  ].join('\n');
   return `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(message)}`;
 }
 
