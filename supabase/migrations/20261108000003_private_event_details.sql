@@ -13,17 +13,17 @@ create table if not exists public.private_event_details (
 
 with source as (
   select coalesce(
-    (select value from public.site_content where key = 'content' limit 1),
+    (select value::jsonb from public.site_content where key = 'content' limit 1),
     '{}'::jsonb
   ) as value
 )
 insert into public.private_event_details (id, venue, venue_detail, map_url, travel)
 select
   'main',
-  coalesce(nullif(value->>'venue', ''), 'Cocody Angré Mahou'),
-  coalesce(nullif(value->>'venueDetail', ''), 'Près de Laser Park'),
-  coalesce(nullif(value->>'mapUrl', ''), 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48'),
-  coalesce(nullif(value->'travel', 'null'::jsonb), jsonb_build_object(
+  coalesce(nullif(value::jsonb->>'venue', ''), 'Cocody Angré Mahou'),
+  coalesce(nullif(value::jsonb->>'venueDetail', ''), 'Près de Laser Park'),
+  coalesce(nullif(value::jsonb->>'mapUrl', ''), 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48'),
+  coalesce(nullif(value::jsonb->'travel', 'null'::jsonb), jsonb_build_object(
     'stopName', 'Commissariat du 22e arrondissement',
     'walkNote', 'Depuis l’arrêt, marchez jusqu’à Laser Park, puis jusqu’au lieu de réception.',
     'taxiFrom', 'Carrefour La Vie',
@@ -48,7 +48,7 @@ on conflict (id) do update set
 
 -- Retire ces champs de la ligne publique : ils ne doivent plus être exposés via l'API REST.
 update public.site_content
-set value = coalesce(value, '{}'::jsonb) - 'venue' - 'venueDetail' - 'mapUrl' - 'travel',
+set value = coalesce(value::jsonb, '{}'::jsonb) - 'venue' - 'venueDetail' - 'mapUrl' - 'travel',
     updated_at = now()
 where key = 'content';
 
