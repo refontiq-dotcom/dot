@@ -61,11 +61,9 @@ export default function Home() {
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    try {
-      setShowTravelGuide(window.sessionStorage.getItem('dot-travel-guide-unlocked') === 'yes');
-    } catch {
-      setShowTravelGuide(false);
-    }
+    // Une ancienne valeur de session ne constitue jamais une preuve de confirmation.
+    try { window.sessionStorage.removeItem('dot-travel-guide-unlocked'); } catch {}
+    setShowTravelGuide(false);
   }, []);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
@@ -246,7 +244,20 @@ export default function Home() {
       setPhone(parsed.display);
       setAttending(result.attending ? 'yes' : 'no');
       setCompanions(result.attending ? found : []);
-      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, found.length)));
+      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, Math.min(found.length, MAX_COMPANIONS))));
+      if (result.status === 'accepted' && result.venueDetails) {
+        const details = result.venueDetails as Record<string, unknown>;
+        setContent(current => ({
+          ...current,
+          venue: String(details.venue ?? ''),
+          venueDetail: String(details.venue_detail ?? ''),
+          mapUrl: String(details.map_url ?? ''),
+          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
+        }));
+        setShowTravelGuide(true);
+      } else {
+        setShowTravelGuide(false);
+      }
       setPendingRemoval(null);
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -344,6 +355,16 @@ export default function Home() {
         throw new Error(result.error || 'Enregistrement impossible.');
       }
 
+      if (result.status === 'accepted' && result.venueDetails) {
+        const details = result.venueDetails as Record<string, unknown>;
+        setContent(current => ({
+          ...current,
+          venue: String(details.venue ?? ''),
+          venueDetail: String(details.venue_detail ?? ''),
+          mapUrl: String(details.map_url ?? ''),
+          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
+        }));
+      }
       setRsvpReceipt({
         guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
         attending: typeof result.attending === 'boolean' ? result.attending : attendingYes,
@@ -354,17 +375,8 @@ export default function Home() {
         status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
       });
 
-      const travelGuideUnlocked = attendingYes && result.status === 'accepted';
+      const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
       setShowTravelGuide(travelGuideUnlocked);
-      try {
-        if (travelGuideUnlocked) {
-          window.sessionStorage.setItem('dot-travel-guide-unlocked', 'yes');
-        } else {
-          window.sessionStorage.removeItem('dot-travel-guide-unlocked');
-        }
-      } catch {
-        // Le guide reste accessible dans la session courante même si le stockage est indisponible.
-      }
       resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -504,26 +516,29 @@ export default function Home() {
             <div data-reveal>
               <div className="eyebrow">Retrouvons-nous</div>
               <h2>Comment venir ?</h2>
-              <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
-              <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
-              <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-              <div style={{ marginTop: 16 }}>
-                <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
-              </div>
-              {showTravelGuide ? (
-                <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+              {showTravelGuide && content.venue ? (
+                <>
+                  <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
+                  <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
+                  <div style={{ marginTop: 16 }}>
+                    <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
+                  </div>
+                  <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+                </>
               ) : (
                 <div className="card" style={{ marginTop: 24 }}>
-                  <div className="eyebrow">Accès aux indications détaillées</div>
-                  <h3>Vous venez célébrer avec nous ?</h3>
-                  <p>Confirmez votre présence dans le formulaire ci-dessous pour afficher les différents moyens de rejoindre le lieu de réception.</p>
-                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ma présence</a>
+                  <div className="eyebrow">Informations pratiques</div>
+                  <h3>Le lieu sera communiqué après confirmation de votre présence.</h3>
+                  <p>Si vous avez déjà répondu, retrouvez votre réponse avec votre nom et votre numéro pour consulter les indications.</p>
+                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ou retrouver ma réponse</a>
                 </div>
               )}
             </div>
-            <div className="mapbox" data-reveal>
-              <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
-            </div>
+            {showTravelGuide && content.venue ? (
+              <div className="mapbox" data-reveal>
+                <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
+              </div>
+            ) : <div className="mapbox" data-reveal><div><Lock size={30}/><p style={{margin:'8px 0 2px',fontWeight:700}}>Accès réservé</p><small>Les indications seront affichées après confirmation.</small></div></div>}
           </div>
         </section>
 
