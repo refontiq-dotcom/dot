@@ -31,8 +31,19 @@ export default function AdminPage() {
   },[]);
   const refresh=useCallback(async()=>{
     setLoading(true);setNotice('');
-    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,attendance_status,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false})]);
-      if(r.error)throw r.error;setContent(c);setGuests((r.data??[]) as RSVP[]);
+    try { const sb=getSupabase(); const {data:auth}=await sb.auth.getSession(); const token=auth.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const [c,r,privateResponse]=await Promise.all([
+        loadContent(),
+        sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,attendance_status,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false}),
+        fetch('/api/admin/event-details',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}),
+      ]);
+      if(r.error)throw r.error;
+      const privateResult=await privateResponse.json();
+      if(!privateResponse.ok)throw new Error(privateResult.error||'Impossible de charger le lieu privé.');
+      const d=privateResult.details??{};
+      setContent({...c,venue:String(d.venue??''),venueDetail:String(d.venue_detail??''),mapUrl:String(d.map_url??''),travel:{...c.travel,...(d.travel??{})}});
+      setGuests((r.data??[]) as RSVP[]);
     } catch(e){setNotice(e instanceof Error?e.message:'Chargement impossible.');} finally{setLoading(false);}
   },[]);
   useEffect(()=>{void checkSession();let sub:{unsubscribe:()=>void}|undefined;
@@ -58,7 +69,14 @@ export default function AdminPage() {
   function moveItem(i:number,dir:-1|1){setContent(v=>{const j=i+dir;if(j<0||j>=v.items.length)return v;const items=[...v.items];[items[i],items[j]]=[items[j],items[i]];return {...v,items};});}
   function sortItemsByTime(){setContent(v=>({...v,items:sortByTime(v.items)}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
-  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.travel.stopName.trim())throw new Error('Indiquez le nom de l’arrêt où les bus descendent.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};await saveContent(next);setContent(next);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){const raw=e instanceof Error?e.message:'';setNotice(/column .*(time|phase|highlight).* does not exist/i.test(raw)?'Le programme nécessite une mise à jour de la base : exécutez les migrations 20261106000002 et 20261106000003 dans Supabase, puis réessayez.':raw||'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.travel.stopName.trim())throw new Error('Indiquez le nom de l’arrêt où les bus descendent.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};
+      await saveContent(next);
+      const sb=getSupabase();const {data:auth}=await sb.auth.getSession();const token=auth.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const privateResponse=await fetch('/api/admin/event-details',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({venue:next.venue,venueDetail:next.venueDetail,mapUrl:next.mapUrl,travel:next.travel})});
+      const privateResult=await privateResponse.json();
+      if(!privateResponse.ok)throw new Error(privateResult.error||'Impossible d’enregistrer le lieu privé.');
+      setContent(next);setNotice('Modifications enregistrées. Le lieu reste privé et ne sera communiqué qu’aux invités acceptés.');}catch(e){const raw=e instanceof Error?e.message:'';setNotice(/column .*(time|phase|highlight).* does not exist/i.test(raw)?'Le programme nécessite une mise à jour de la base : exécutez les migrations 20261106000002 et 20261106000003 dans Supabase, puis réessayez.':raw||'Enregistrement impossible.');}finally{setSaving(false);}}
   async function uploadPagneImage(event:ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     event.target.value='';
