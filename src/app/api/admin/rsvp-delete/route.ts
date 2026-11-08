@@ -31,17 +31,15 @@ export async function DELETE(request: NextRequest) {
   const id = typeof body.id === 'string' ? body.id : '';
   if (!/^[0-9a-f-]{36}$/i.test(id)) return reply({ error: 'Inscription invalide.' }, 400);
 
-  const { data, error } = await supabase
-    .from('rsvp_responses')
-    .delete()
-    .eq('id', id)
-    .select('id')
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('delete_rsvp_duplicate_and_promote_waitlist', {
+    p_rsvp_id: id,
+  });
 
   if (error) {
+    if (error.message?.includes('rsvp_not_found')) return reply({ error: 'Cette inscription n’existe plus. Actualisez la liste.' }, 404);
+    if (error.message?.includes('duplicate_not_found')) return reply({ error: 'Cette inscription ne correspond plus à un doublon signalé. Actualisez la liste.' }, 409);
     console.error('Dot RSVP deletion failed:', error.message);
-    return reply({ error: 'Suppression impossible. Vérifiez que les données liées à cette inscription peuvent être supprimées.' }, 409);
+    return reply({ error: 'Suppression impossible. Vérifiez que la migration de suppression sécurisée est appliquée.' }, 500);
   }
-  if (!data) return reply({ error: 'Cette inscription n’existe plus. Actualisez la liste.' }, 404);
-  return reply({ ok: true });
+  return reply({ ok: true, promoted: data });
 }
