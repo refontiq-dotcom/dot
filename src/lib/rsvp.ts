@@ -143,6 +143,9 @@ export function cleanCompanionNames(input: unknown, attending: boolean): Compani
     if (name.length < 2 || name.length > 120) {
       return { ok: false, error: 'Chaque proche doit avoir un nom et prénom (2 à 120 caractères).' };
     }
+    if (!/\p{L}/u.test(name)) {
+      return { ok: false, error: 'Le nom de chaque proche doit contenir au moins une lettre.' };
+    }
     const key = normalizeNameKey(name);
     if (!key) {
       return { ok: false, error: 'Le nom d’un proche est invalide.' };
