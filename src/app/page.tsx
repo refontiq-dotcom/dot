@@ -87,7 +87,6 @@ export default function Home() {
   const [lookupPhone, setLookupPhone] = useState('');
   const [lookupResult, setLookupResult] = useState<RsvpLookup | null>(null);
   const [lookupStatus, setLookupStatus] = useState('');
-  const [showTravelGuide, setShowTravelGuide] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
   const modalRef = useRef<HTMLDivElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
@@ -95,7 +94,6 @@ export default function Home() {
   useEffect(() => {
     // Une ancienne valeur de session ne constitue jamais une preuve de confirmation.
     try { window.sessionStorage.removeItem('dot-travel-guide-unlocked'); } catch {}
-    setShowTravelGuide(false);
   }, []);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
@@ -273,7 +271,6 @@ export default function Home() {
       };
       setLookupResult(found);
       if (found.venueDetails) setContent(current => ({ ...current, venue: String(found.venueDetails?.venue ?? ''), venueDetail: String(found.venueDetails?.venue_detail ?? ''), mapUrl: String(found.venueDetails?.map_url ?? ''), travel: found.venueDetails?.travel ?? current.travel }));
-      setShowTravelGuide(found.status === 'accepted' && Boolean(found.venueDetails));
     } catch (error) {
       setLookupStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
     } finally { setLookupBusy(false); }
@@ -399,7 +396,6 @@ export default function Home() {
       });
 
       const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
-      setShowTravelGuide(travelGuideUnlocked);
       resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -543,7 +539,7 @@ export default function Home() {
                 </div>
               )}
             </section>
-            <form className="rsvp-form" onSubmit={submitRsvp} data-reveal>
+            <form className={'rsvp-form' + (editMode ? ' is-edit-modal' : '')} onSubmit={submitRsvp} data-reveal={!editMode} role={editMode ? 'dialog' : undefined} aria-modal={editMode ? true : undefined} aria-label={editMode ? 'Modifier ma présence' : undefined}>
               {editMode && (
                 <div className="rsvp-edit-banner" role="status">
                   <b>Vous modifiez votre réponse</b>
@@ -637,15 +633,9 @@ export default function Home() {
                 <button className="button" type="submit" disabled={rsvpBusy || lookupBusy}>
                   {rsvpBusy ? 'Envoi en cours…' : editMode ? 'Enregistrer mes modifications' : 'Envoyer ma réponse'}
                 </button>
-                {editMode ? (
-                  <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>
-                ) : (
-                  <button className="button secondary" type="button" onClick={() => void startEdit()} disabled={rsvpBusy || lookupBusy}>
-                    <Pencil size={17} /> {lookupBusy ? 'Recherche…' : 'Modifier ma réponse'}
-                  </button>
-                )}
+                {editMode && <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>}
               </div>
-              {!editMode && <p className="rsvp-hint">Déjà répondu ? Entrez votre nom et votre numéro, puis touchez « Modifier ma réponse ».</p>}
+              {!editMode && <p className="rsvp-hint">Déjà répondu ? Utilisez le cadre ci-dessus pour retrouver votre inscription.</p>}
               {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
               <p className="rsvp-privacy">Votre numéro et votre réponse restent privés.</p>
             </form>
@@ -693,6 +683,15 @@ export default function Home() {
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
       </nav>
+
+  useEffect(() => {
+    if (!editMode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelEdit();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [editMode]);
 
       {rsvpReceipt && (
         <div
