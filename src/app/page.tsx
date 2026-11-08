@@ -708,9 +708,9 @@ export default function Home() {
         >
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="rsvp-modal-title" aria-describedby="rsvp-modal-text" ref={modalRef}>
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
-              {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
+              {rsvpReceipt.attending && rsvpReceipt.status !== 'waitlisted' ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.status === 'waitlisted' ? 'Votre réponse a bien été reçue' : rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
             {rsvpReceipt.status === 'waitlisted' ? (
               <>
