@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
-import { declaredGroupSize, namesMayReferToSamePerson, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
+import { declaredGroupSize, namesMayReferToSamePerson, summarizeGuests } from '@/lib/rsvp';
 import { formatRange, sortByTime } from '@/lib/program';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
