@@ -36,6 +36,17 @@ type RsvpReceipt = {
   status: 'accepted' | 'waitlisted' | 'declined' | 'review';
 };
 
+type RsvpLookup = {
+  guestName: string;
+  attending: boolean;
+  companions: string[];
+  companionCount: number;
+  personCount: number;
+  maxCompanions: number;
+  status: 'accepted' | 'waitlisted' | 'declined' | 'review';
+  venueDetails?: { venue?: string; venue_detail?: string; map_url?: string; travel?: Content['travel'] };
+};
+
 function Calendar() {
   return <CalendarDays size={19} />;
 }
@@ -73,6 +84,9 @@ export default function Home() {
   const [editOriginalName, setEditOriginalName] = useState('');
   const [maxCompanions, setMaxCompanions] = useState(MAX_COMPANIONS);
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupResult, setLookupResult] = useState<RsvpLookup | null>(null);
+  const [lookupStatus, setLookupStatus] = useState('');
   const [showTravelGuide, setShowTravelGuide] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -121,7 +135,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    const sections = ['accueil', 'annonces', 'programme', 'lieu', 'rsvp', 'faq']
+    const sections = ['accueil', 'annonces', 'programme', 'rsvp', 'faq']
       .map(id => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) return;
@@ -234,56 +248,47 @@ export default function Home() {
     setMaxCompanions(MAX_COMPANIONS);
   }
 
-  // Retrouve la réponse de l'invité (nom + numéro) pour la modifier.
-  async function startEdit() {
-    setRsvpStatus('');
-    const parsed = normalizeIvorianPhone(phone);
-    if (!parsed.ok) {
-      setRsvpStatus(parsed.error);
-      return;
-    }
-    if (guestName.trim().length < 2) {
-      setRsvpStatus('Indiquez votre nom et prénom, comme lors de votre première réponse.');
-      return;
-    }
+  // Retrouve la réponse déjà enregistrée à partir du numéro de téléphone.
+  async function findRsvp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLookupStatus('');
+    setLookupResult(null);
+    const parsed = normalizeIvorianPhone(lookupPhone);
+    if (!parsed.ok) { setLookupStatus(parsed.error); return; }
     setLookupBusy(true);
     try {
       const response = await fetch('/api/rsvp/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName, phone: parsed.normalized }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: parsed.normalized }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Réponse introuvable.');
-      const found: string[] = Array.isArray(result.companions) ? result.companions.map(String) : [];
-      setEditMode(true);
-      setEditOriginalName(String(result.guestName));
-      setGuestName(String(result.guestName));
-      setPhone(parsed.display);
-      setAttending(result.attending ? 'yes' : 'no');
-      setCompanions(result.attending ? found : []);
-      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, Math.min(found.length, MAX_COMPANIONS))));
-      if (result.status === 'accepted' && result.venueDetails) {
-        const details = result.venueDetails as Record<string, unknown>;
-        setContent(current => ({
-          ...current,
-          venue: String(details.venue ?? ''),
-          venueDetail: String(details.venue_detail ?? ''),
-          mapUrl: String(details.map_url ?? ''),
-          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
-        }));
-        setShowTravelGuide(true);
-      } else {
-        setShowTravelGuide(false);
-      }
-      setPendingRemoval(null);
+      const found: RsvpLookup = {
+        guestName: String(result.guestName), attending: Boolean(result.attending),
+        companions: Array.isArray(result.companions) ? result.companions.map(String) : [],
+        companionCount: Number(result.companionCount) || 0, personCount: Number(result.personCount) || 0,
+        maxCompanions: Number(result.maxCompanions) || 0,
+        status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : result.status === 'review' ? 'review' : 'accepted',
+        ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
+      };
+      setLookupResult(found);
+      if (found.venueDetails) setContent(current => ({ ...current, venue: String(found.venueDetails?.venue ?? ''), venueDetail: String(found.venueDetails?.venue_detail ?? ''), mapUrl: String(found.venueDetails?.map_url ?? ''), travel: found.venueDetails?.travel ?? current.travel }));
+      setShowTravelGuide(found.status === 'accepted' && Boolean(found.venueDetails));
     } catch (error) {
-      setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
-    } finally {
-      setLookupBusy(false);
-    }
+      setLookupStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
+    } finally { setLookupBusy(false); }
   }
 
+  // Ouvre le formulaire de modification existant avec les informations retrouvées.
+  function startEdit() {
+    if (!lookupResult) return;
+    setRsvpStatus(''); setEditMode(true); setEditOriginalName(lookupResult.guestName);
+    setGuestName(lookupResult.guestName); setPhone(lookupPhone);
+    setAttending(lookupResult.attending ? 'yes' : 'no');
+    setCompanions(lookupResult.attending ? [...lookupResult.companions] : []);
+    setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(lookupResult.maxCompanions, Math.min(lookupResult.companions.length, MAX_COMPANIONS))));
+    setPendingRemoval(null);
+  }
   function cancelEdit() {
     resetRsvpForm();
   }
