@@ -590,7 +590,7 @@ export default function Home() {
                   <label htmlFor="companion-count">Qui vient avec vous ?</label>
                   <p className="rsvp-hint">Famille, conjoint(e), enfants : vous êtes les bienvenus. Dites-nous simplement combien vous serez.</p>
                   <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
-                    {Array.from({ length: (editMode ? maxCompanions : MAX_COMPANIONS) + 1 }, (_, index) => index).map(count => (
+                    {Array.from({ length: (editMode ? Math.max(maxCompanions, companions.length) : MAX_COMPANIONS) + 1 }, (_, index) => index).map(count => (
                       <option key={count} value={count}>
                         {count === 0 ? 'Je viens seul(e)' : `${count} proche${count > 1 ? 's' : ''} avec moi`}
                       </option>
