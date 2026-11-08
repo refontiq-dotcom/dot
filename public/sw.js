@@ -11,7 +11,7 @@ const VERSION = 'dot-v2';
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const DATA = `${VERSION}-data`;
-const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const PRECACHE = ['/', '/manifest.webmanifest', '/couple-frederic-vanessa.jpg'];
 const PUBLIC_DATA = /\/rest\/v1\/(site_content|program_items|faq_items)(\?|$)/;
 const NETWORK_TIMEOUT_MS = 4000;
 
