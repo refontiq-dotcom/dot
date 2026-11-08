@@ -11,15 +11,36 @@ create table if not exists public.private_event_details (
   updated_at timestamptz not null default now()
 );
 
+with source as (
+  select value
+  from public.site_content
+  where key = 'content'
+  union all
+  select '{}'::jsonb
+  limit 1
+)
 insert into public.private_event_details (id, venue, venue_detail, map_url, travel)
 select
   'main',
-  coalesce(value->>'venue', ''),
-  coalesce(value->>'venueDetail', ''),
-  coalesce(value->>'mapUrl', ''),
-  coalesce(value->'travel', '{}'::jsonb)
-from public.site_content
-where key = 'content'
+  coalesce(nullif(value->>'venue', ''), 'Cocody Angré Mahou'),
+  coalesce(nullif(value->>'venueDetail', ''), 'Près de Laser Park'),
+  coalesce(nullif(value->>'mapUrl', ''), 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48'),
+  coalesce(value->'travel', jsonb_build_object(
+    'stopName', 'Commissariat du 22e arrondissement',
+    'walkNote', 'Depuis l’arrêt, marchez jusqu’à Laser Park, puis jusqu’au lieu de réception.',
+    'taxiFrom', 'Carrefour La Vie',
+    'taxiStop', 'Carrefour du commissariat du 22e arrondissement',
+    'taxiDestination', 'Laser Park, Cocody Angré Mahou',
+    'busLines', jsonb_build_array(
+      jsonb_build_object('id','bus-81','number','81','from','Gare Nord (Adjamé)','to',''),
+      jsonb_build_object('id','bus-82','number','82','from','Gare Sud (Plateau)','to',''),
+      jsonb_build_object('id','bus-90','number','90','from','Cocody Blockhaus','to',''),
+      jsonb_build_object('id','bus-719','number','719','from','Yopougon Saint-André','to','Cocody Terminus 81-82'),
+      jsonb_build_object('id','bus-775','number','775','from','Gare de Bassam (Treichville)','to','Angré Château (Cocody)'),
+      jsonb_build_object('id','bus-704','number','704','from','Saint-Jean (Cocody)','to','Angré Château')
+    )
+  ))
+from source
 on conflict (id) do update set
   venue = case when excluded.venue <> '' then excluded.venue else private_event_details.venue end,
   venue_detail = case when excluded.venue_detail <> '' then excluded.venue_detail else private_event_details.venue_detail end,
