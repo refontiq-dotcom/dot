@@ -421,7 +421,18 @@ export default function Home() {
     document.body.style.overflow = 'hidden';
     document.getElementById('guest-name')?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setEditMode(false);
+      if (event.key === 'Escape') {
+        setGuestName('');
+        setPhone('');
+        setAttending('yes');
+        setCompanions([]);
+        setPendingRemoval(null);
+        setWebsite('');
+        setRsvpStatus('');
+        setEditMode(false);
+        setEditOriginalName('');
+        setMaxCompanions(MAX_COMPANIONS);
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
