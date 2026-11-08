@@ -716,7 +716,7 @@ export default function Home() {
                 <>
                   <details data-reveal>
                     <summary>J’ai déjà répondu. Comment retrouver les informations ?</summary>
-                    <p>Entrez le numéro de téléphone utilisé lors de votre inscription dans la rubrique « Déjà enregistré ? ».</p>
+                    <p>Appuyez sur le bouton « Déjà inscrit ? » sous le formulaire, puis saisissez le numéro utilisé lors de votre inscription.</p>
                   </details>
                   <details data-reveal>
                     <summary>Où trouver le lieu de la célébration ?</summary>
