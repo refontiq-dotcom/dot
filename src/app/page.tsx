@@ -40,6 +40,24 @@ function Calendar() {
   return <CalendarDays size={19} />;
 }
 
+function pagneWhatsAppUrl(phone: string, guestName: string, personCount: number, sellerName: string, price: number, eventCouple: string) {
+  const digits = phone.replace(/\D/g, '');
+  const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
+  const groupLabel = personCount > 1 ? `${personCount} personnes` : '1 personne';
+  const message = [
+    `Bonjour ${sellerName},`,
+    '',
+    `Je suis ${guestName}. J'ai confirmé ma présence à la dot de ${eventCouple}.`,
+    `Nous serons ${groupLabel}.`,
+    '',
+    `Je souhaite commander le pagne officiel de la dot, au prix de ${price.toLocaleString('fr-FR')} FCFA le morceau.`,
+    'Pouvez-vous m’indiquer les modalités de commande et de retrait ?',
+    '',
+    'Merci.'
+  ].join('\n');
+  return `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(message)}`;
+}
+
 export default function Home() {
   const [content, setContent] = useState<Content>(initialContent);
   const [guestName, setGuestName] = useState('');
@@ -732,6 +750,29 @@ export default function Home() {
                 </div>
                 {rsvpReceipt.possibleDuplicate && (
                   <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>
+                )}
+                {content.pagne.enabled && content.pagne.contacts.length > 0 && (
+                  <section className="modal-pagne" aria-labelledby="modal-pagne-title">
+                    <div className="modal-pagne-heading"><ShoppingBag size={19} /><span id="modal-pagne-title">Pensez à votre uniforme</span></div>
+                    <p>Pour cette journée, les familles invitent tous les convives à porter le pagne officiel de la dot.</p>
+                    <strong className="modal-pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA <span>le morceau</span></strong>
+                    <div className="modal-pagne-contacts">
+                      {content.pagne.contacts.map((contact, index) => {
+                        const digits = contact.phone.replace(/\D/g, '');
+                        const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
+                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
+                        return digits.length >= 8 ? (
+                          <div className="modal-pagne-contact" key={contact.id}>
+                            <span>Contact : <strong>{sellerName}</strong></span>
+                            <div className="modal-pagne-actions">
+                              <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Commander sur WhatsApp</a>
+                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} /> Appeler</a>
+                            </div>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  </section>
                 )}
                 <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">

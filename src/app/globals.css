@@ -119,6 +119,18 @@
 .modal-event svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
 .modal-actions{display:grid;gap:9px;margin-top:18px}
 .modal-actions .button{width:100%}
+.modal-pagne{margin:16px 0;padding:15px;border:1px solid #d5e6e8;border-radius:13px;background:linear-gradient(145deg,#f0f8f8,#fffdf9)}
+.modal-pagne-heading{display:flex;align-items:center;gap:8px;color:var(--deep);font-weight:800;margin-bottom:7px}
+.modal-pagne-heading svg{color:var(--accent);flex-shrink:0}
+.modal-pagne>p{font-size:13px;line-height:1.5;margin:0 0 9px}
+.modal-pagne-price{display:block;color:var(--deep);font-size:21px;margin:4px 0 12px}
+.modal-pagne-price span{font-size:12px;font-weight:500;color:var(--muted)}
+.modal-pagne-contacts{display:grid;gap:10px}
+.modal-pagne-contact{display:grid;gap:8px;font-size:13px;color:var(--muted)}
+.modal-pagne-contact>span strong{color:var(--deep)}
+.modal-pagne-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modal-pagne-actions .button{width:100%;font-size:13px;padding:9px 10px;min-height:42px}
+@media(max-width:420px){.modal-pagne-actions{grid-template-columns:1fr}}
 @keyframes modal-fade{from{opacity:0}to{opacity:1}}
 @keyframes modal-rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 @media(max-width:760px){.modal{padding:22px 20px;border-radius:16px}}
