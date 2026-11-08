@@ -86,8 +86,11 @@ export default function Home() {
   const [lookupPhone, setLookupPhone] = useState('');
   const [lookupResult, setLookupResult] = useState<RsvpLookup | null>(null);
   const [lookupStatus, setLookupStatus] = useState('');
+  const [lookupModalOpen, setLookupModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
   const modalRef = useRef<HTMLDivElement>(null);
+  const lookupModalRef = useRef<HTMLDivElement>(null);
+  const lookupCloseRef = useRef<HTMLButtonElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -418,6 +421,21 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (!lookupModalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    lookupCloseRef.current?.focus();
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLookupModalOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lookupModalOpen]);
+
+  useEffect(() => {
     if (!editMode) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
@@ -531,48 +549,6 @@ export default function Home() {
               <h2>Confirmer votre présence</h2>
               <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
             </div>
-            <section className="rsvp-lookup-card" aria-labelledby="rsvp-lookup-title" data-reveal>
-              <div className="eyebrow">Vous avez déjà répondu ?</div>
-              <h3 id="rsvp-lookup-title">Déjà enregistré ?</h3>
-              <p>Entrez le numéro utilisé lors de votre inscription pour retrouver votre réponse et les informations réservées aux invités confirmés.</p>
-              <form className="rsvp-lookup-form" onSubmit={findRsvp}>
-                <label htmlFor="lookup-phone">Votre numéro de téléphone</label>
-                <input id="lookup-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} required value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} placeholder="Ex. : 07 00 00 00 00" />
-                <button className="button" type="submit" disabled={lookupBusy}>{lookupBusy ? 'Recherche…' : 'Retrouver ma réponse'}</button>
-              </form>
-              {lookupStatus && <p className="rsvp-status" role="alert">{lookupStatus}</p>}
-              {lookupResult && (
-                <div className="rsvp-lookup-result" aria-live="polite">
-                  <div className="rsvp-lookup-result-head">
-                    <div><span className="eyebrow">Votre réponse</span><h3>{lookupResult.guestName}</h3></div>
-                    <span className={'rsvp-lookup-status ' + lookupResult.status}>{lookupResult.status === 'accepted' ? 'Présence confirmée' : lookupResult.status === 'waitlisted' ? 'En liste d’attente' : lookupResult.status === 'review' ? 'À vérifier' : 'Absence enregistrée'}</span>
-                  </div>
-                  <p>{lookupResult.status === 'accepted' ? 'Votre groupe compte ' + lookupResult.personCount + ' personne' + (lookupResult.personCount > 1 ? 's' : '') + '.' : lookupResult.status === 'waitlisted' ? 'Votre demande est enregistrée. Les familles vous informeront si une place se libère.' : lookupResult.status === 'review' ? 'Votre demande doit encore être vérifiée par les familles.' : 'Votre absence a bien été enregistrée.'}</p>
-                  {lookupResult.attending && lookupResult.companions.length > 0 && <p className="rsvp-lookup-names"><strong>Personnes déclarées :</strong> {lookupResult.guestName}, {lookupResult.companions.join(', ')}</p>}
-                  {lookupResult.status === 'accepted' && lookupResult.venueDetails && (
-                    <div className="rsvp-private-details">
-                      <div className="eyebrow">Informations réservées aux invités confirmés</div>
-                      <h4><MapPin size={18} /> {content.venue || 'Votre lieu de réception'}</h4>
-                      {content.venueDetail && <p>{content.venueDetail}</p>}
-                      {venueMapUrl && <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
-                      <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
-                    </div>
-                  )}
-                  {lookupResult.status === 'accepted' && content.pagne.enabled && (
-                    <div className="rsvp-private-pagne">
-                      <div className="eyebrow"><ShoppingBag size={16} /> Pagne officiel</div>
-                      <p>Vous souhaitez commander le pagne de la dot ? Contactez directement la vendeuse.</p>
-                      <strong>{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA le morceau</strong>
-                      <div className="pagne-actions">
-                        <a className="button" href={pagneWhatsAppUrl('+225 0501190633', lookupResult.guestName, lookupResult.personCount, content.pagne.contacts[0]?.label || 'Madame Traoré', Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Commander sur WhatsApp</a>
-                        <a className="button secondary" href="tel:+2250501190633"><Phone size={17} /> Appeler</a>
-                      </div>
-                    </div>
-                  )}
-                  <div className="rsvp-lookup-actions"><button type="button" className="button" onClick={startEdit}><Pencil size={17} /> Modifier ma présence</button></div>
-                </div>
-              )}
-            </section>
             <form className={'rsvp-form' + (editMode ? ' is-edit-modal' : '')} onSubmit={submitRsvp} data-reveal={editMode ? undefined : true} role={editMode ? 'dialog' : undefined} aria-modal={editMode ? true : undefined} aria-label={editMode ? 'Modifier ma présence' : undefined}>
               {editMode && (
                 <div className="rsvp-edit-banner" role="status">
@@ -669,10 +645,57 @@ export default function Home() {
                 </button>
                 {editMode && <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>}
               </div>
-              {!editMode && <p className="rsvp-hint">Déjà répondu ? Utilisez le cadre ci-dessus pour retrouver votre inscription.</p>}
+              {!editMode && <button type="button" className="button secondary rsvp-open-lookup" onClick={() => { setLookupStatus(''); setLookupModalOpen(true); }}><Pencil size={17} /> Déjà inscrit ?</button>}
               {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
               <p className="rsvp-privacy">Votre numéro et votre réponse restent privés.</p>
             </form>
+            {lookupModalOpen && (
+              <div className="rsvp-modal-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLookupModalOpen(false); }}>
+                <section className="rsvp-lookup-card rsvp-lookup-modal" role="dialog" aria-modal="true" aria-labelledby="rsvp-lookup-title" ref={lookupModalRef}>
+                  <button type="button" className="rsvp-modal-close" ref={lookupCloseRef} onClick={() => setLookupModalOpen(false)} aria-label="Fermer la fenêtre">×</button>
+                  <div className="eyebrow">Vous avez déjà répondu ?</div>
+                  <h3 id="rsvp-lookup-title">Retrouver mon inscription</h3>
+                  <p>Entrez le numéro de téléphone utilisé lors de votre inscription pour retrouver votre réponse et les informations réservées aux invités confirmés.</p>
+                  <form className="rsvp-lookup-form" onSubmit={findRsvp}>
+                    <label htmlFor="lookup-phone">Votre numéro de téléphone</label>
+                    <input id="lookup-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} required value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} placeholder="Ex. : 07 00 00 00 00" />
+                    <button className="button" type="submit" disabled={lookupBusy}>{lookupBusy ? 'Recherche…' : 'Retrouver ma réponse'}</button>
+                  </form>
+                  {lookupStatus && <p className="rsvp-status" role="alert">{lookupStatus}</p>}
+                  {lookupResult && (
+                    <div className="rsvp-lookup-result" aria-live="polite">
+                      <div className="rsvp-lookup-result-head">
+                        <div><span className="eyebrow">Votre réponse</span><h3>{lookupResult.guestName}</h3></div>
+                        <span className={'rsvp-lookup-status ' + lookupResult.status}>{lookupResult.status === 'accepted' ? 'Présence confirmée' : lookupResult.status === 'waitlisted' ? 'En liste d’attente' : lookupResult.status === 'review' ? 'À vérifier' : 'Absence enregistrée'}</span>
+                      </div>
+                      <p>{lookupResult.status === 'accepted' ? 'Votre groupe compte ' + lookupResult.personCount + ' personne' + (lookupResult.personCount > 1 ? 's' : '') + '.' : lookupResult.status === 'waitlisted' ? 'Votre demande est enregistrée. Les familles vous informeront si une place se libère.' : lookupResult.status === 'review' ? 'Votre demande doit encore être vérifiée par les familles.' : 'Votre absence a bien été enregistrée.'}</p>
+                      {lookupResult.attending && lookupResult.companions.length > 0 && <p className="rsvp-lookup-names"><strong>Personnes déclarées :</strong> {lookupResult.guestName}, {lookupResult.companions.join(', ')}</p>}
+                      {lookupResult.status === 'accepted' && lookupResult.venueDetails && (
+                        <div className="rsvp-private-details">
+                          <div className="eyebrow">Informations réservées aux invités confirmés</div>
+                          <h4><MapPin size={18} /> {content.venue || 'Votre lieu de réception'}</h4>
+                          {content.venueDetail && <p>{content.venueDetail}</p>}
+                          {venueMapUrl && <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
+                          <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+                        </div>
+                      )}
+                      {lookupResult.status === 'accepted' && content.pagne.enabled && (
+                        <div className="rsvp-private-pagne">
+                          <div className="eyebrow"><ShoppingBag size={16} /> Pagne officiel</div>
+                          <p>Vous souhaitez commander le pagne de la dot ? Contactez directement la vendeuse.</p>
+                          <strong>{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA le morceau</strong>
+                          <div className="pagne-actions">
+                            <a className="button" href={pagneWhatsAppUrl('+225 0501190633', lookupResult.guestName, lookupResult.personCount, content.pagne.contacts[0]?.label || 'Madame Traoré', Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Commander sur WhatsApp</a>
+                            <a className="button secondary" href="tel:+2250501190633"><Phone size={17} /> Appeler</a>
+                          </div>
+                        </div>
+                      )}
+                      <div className="rsvp-lookup-actions"><button type="button" className="button" onClick={() => { setLookupModalOpen(false); startEdit(); }}><Pencil size={17} /> Modifier ma présence</button></div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
           </div>
         </section>
 
