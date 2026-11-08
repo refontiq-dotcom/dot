@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: 'Deux peuples pour une union sacrée — Anougbre Brou Frédéric & Dukoua You Vanessa',
   description: 'Toutes les informations pratiques pour célébrer la dot traditionnelle d’Anougbre Brou Frédéric et Dukoua You Vanessa, le 12 décembre 2026 à Cocody Angré.',
   applicationName: 'Dot',
+  icons: {
+    icon: [{ url: '/couple-frederic-vanessa.jpg', type: 'image/jpeg', sizes: '1000x1000' }],
+    apple: [{ url: '/couple-frederic-vanessa.jpg', type: 'image/jpeg', sizes: '1000x1000' }],
+  },
   appleWebApp: { capable: true, title: 'Dot', statusBarStyle: 'default' },
 };
 
