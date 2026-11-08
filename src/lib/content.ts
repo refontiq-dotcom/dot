@@ -88,14 +88,16 @@ class LocalStorageRepository implements ContentRepository {
       if (raw) {
         const parsed = JSON.parse(raw);
         const stored = parsed.content as Partial<Content>;
-        return { ...initialContent, ...stored, travel: { ...initialContent.travel, ...(stored.travel ?? {}) } };
+        return { ...initialContent, ...stored, venue: '', venueDetail: '', mapUrl: '', travel: initialContent.travel };
       }
     } catch {}
     return initialContent;
   }
   async set(content: Content): Promise<void> {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ content, updated: new Date().toISOString() }));
+    const { venue, venueDetail, mapUrl, travel, ...publicContent } = content;
+    void venue; void venueDetail; void mapUrl; void travel;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ content: publicContent, updated: new Date().toISOString() }));
   }
 }
 
