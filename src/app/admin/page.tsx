@@ -110,8 +110,8 @@ export default function AdminPage() {
   const groups=useMemo<GuestGroup[]>(()=>{
     const list:GuestGroup[]=guests.map(g=>{
       const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position).map(c=>c.full_name);
-      const size=declaredGroupSize(g.person_count,companions.length,g.confirmed);
       const status=g.attendance_status??(g.confirmed?'accepted':'declined');
+      const size=status==='declined'?0:Math.max(Number(g.person_count)||0,companions.length+1);
       return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:status==='accepted',status,size,companions,unnamed:status==='accepted'?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
     });
     // Un nom présent dans deux réponses différentes est signalé, jamais fusionné.
@@ -266,7 +266,7 @@ export default function AdminPage() {
         <ul className="admin-guest-list">
           {shown.map(g=>{const digits=g.phone?phoneDigits(g.phone):'';return <li className="admin-guest-card" key={g.id}>
             <div className="admin-guest-top"><b>{g.name}</b><span className={g.status==='accepted'?'admin-status yes':g.status==='waitlisted'?'admin-status':'admin-status no'}>{g.status==='accepted'?'Vient':g.status==='waitlisted'?'En attente':'Ne vient pas'}</span></div>
-            {g.confirmed&&<p className="admin-guest-line"><Users size={16}/><span>{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
+            {(g.status==='accepted'||g.status==='waitlisted')&&<p className="admin-guest-line"><Users size={16}/><span>{g.status==='waitlisted'?'Groupe en attente · ':''}{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
             {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> WhatsApp</a></div>}
             {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
             <p className="admin-guest-date">Répondu le {new Date(g.createdAt).toLocaleDateString('fr-FR')}{g.updatedAt&&g.updatedAt!==g.createdAt&&` · modifié le ${new Date(g.updatedAt).toLocaleDateString('fr-FR')}`}</p>
