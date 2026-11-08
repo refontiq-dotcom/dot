@@ -59,7 +59,7 @@ export function validateGuestName(value: unknown): string | null {
   if (name.length < 2 || name.length > 120) {
     return 'Veuillez saisir votre nom et prénom (2 à 120 caractères).';
   }
-  if (!/\\p{L}/u.test(name)) {
+  if (!/\p{L}/u.test(name)) {
     return 'Le nom doit contenir au moins une lettre.';
   }
   return null;
@@ -96,9 +96,9 @@ export function normalizedNameTokens(value: unknown): string[] {
   const ignored = new Set(['epse', 'epouse', 'mme', 'mr', 'madame', 'monsieur', 'de', 'du', 'des', 'le', 'la', 'les']);
   const normalized = cleanPersonName(value)
     .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^\\p{L}\\p{N}]+/gu, ' ');
+    .replace(/[^\p{L}\p{N}]+/gu, ' ');
   return [...new Set(normalized.split(' ').filter(token => token.length > 1 && !ignored.has(token)))];
 }
 
