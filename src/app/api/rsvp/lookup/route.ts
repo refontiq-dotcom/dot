@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return jsonError('Données invalides.', 400);
   }
+  if (!body || typeof body !== 'object') return jsonError('Données invalides.', 400);
 
   const phone = normalizeIvorianPhone(body.phone);
   if (!phone.ok) return jsonError(phone.error, 400, 'invalid_phone');
