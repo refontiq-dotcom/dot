@@ -24,7 +24,7 @@ import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
 import ProgramTimeline from '@/components/ProgramTimeline';
 import InstallApp from '@/components/InstallApp';
-import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
+import { MAX_COMPANIONS, cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
   guestName: string;
@@ -52,7 +52,7 @@ export default function Home() {
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editOriginalName, setEditOriginalName] = useState('');
-  const [maxCompanions, setMaxCompanions] = useState(9);
+  const [maxCompanions, setMaxCompanions] = useState(MAX_COMPANIONS);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [showTravelGuide, setShowTravelGuide] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
@@ -214,7 +214,7 @@ export default function Home() {
     setRsvpStatus('');
     setEditMode(false);
     setEditOriginalName('');
-    setMaxCompanions(9);
+    setMaxCompanions(MAX_COMPANIONS);
   }
 
   // Retrouve la réponse de l'invité (nom + numéro) pour la modifier.
@@ -245,7 +245,7 @@ export default function Home() {
       setPhone(parsed.display);
       setAttending(result.attending ? 'yes' : 'no');
       setCompanions(result.attending ? found : []);
-      setMaxCompanions(Math.max(Number(result.maxCompanions) || 0, found.length));
+      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, found.length)));
       setPendingRemoval(null);
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -573,7 +573,7 @@ export default function Home() {
                   <label htmlFor="companion-count">Qui vient avec vous ?</label>
                   <p className="rsvp-hint">Famille, conjoint(e), enfants : vous êtes les bienvenus. Dites-nous simplement combien vous serez.</p>
                   <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
-                    {Array.from({ length: (editMode ? maxCompanions : 9) + 1 }, (_, index) => index).map(count => (
+                    {Array.from({ length: (editMode ? maxCompanions : MAX_COMPANIONS) + 1 }, (_, index) => index).map(count => (
                       <option key={count} value={count}>
                         {count === 0 ? 'Je viens seul(e)' : `${count} proche${count > 1 ? 's' : ''} avec moi`}
                       </option>
