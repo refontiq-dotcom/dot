@@ -78,6 +78,8 @@ export default function InstallApp() {
     try {
       await prompt.prompt();
       await prompt.userChoice.catch(() => undefined);
+    } catch {
+      // Si le navigateur refuse le prompt, le visiteur pourra réessayer plus tard.
     } finally {
       setPrompt(null);
       dismiss();
