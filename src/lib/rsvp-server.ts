@@ -2,10 +2,10 @@
 import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { namesMayReferToSamePerson } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
+  lookupPerHourPerIp: 10,
 } as const;
 
 export const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -33,11 +33,11 @@ export function hashIp(ip: string): string {
   return createHash('sha256').update(ip).digest('hex');
 }
 
-/** Adresse IP derrière le proxy Vercel, sans la stocker en clair. */
+/** Adresse IP transmise par le proxy ; seul son hash est conservé en base. */
 export function clientIp(headers: Headers): string {
-  const forwarded = headers.get('x-forwarded-for');
-  const first = forwarded?.split(',')[0]?.trim();
-  return first || headers.get('x-real-ip')?.trim() || 'unknown';
+  return headers.get('x-real-ip')?.trim()
+    || headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || 'unknown';
 }
 
 type RateLimitInput = {
@@ -46,25 +46,22 @@ type RateLimitInput = {
   limit: number;
 };
 
-/** Compte les enregistrements récents ; true si la limite est atteinte. */
-export async function isRateLimited(supabase: SupabaseClient, input: RateLimitInput): Promise<boolean> {
-  const since = new Date(Date.now() - input.windowMinutes * 60_000).toISOString();
-  const { count, error } = await supabase
-    .from('rsvp_rate_events')
-    .select('id', { count: 'exact', head: true })
-    .eq('ip_hash', input.ipHash)
-    .gte('created_at', since);
+/**
+ * Enregistre et vérifie une tentative dans une seule transaction SQL.
+ * La fonction PostgreSQL sérialise les requêtes d'une même IP pour éviter
+ * qu'un grand nombre de requêtes simultanées contourne la limite.
+ */
+export async function consumeRateLimit(supabase: SupabaseClient, input: RateLimitInput): Promise<boolean> {
+  const { data, error } = await supabase.rpc('consume_rsvp_rate_limit', {
+    p_ip_hash: input.ipHash,
+    p_window_minutes: input.windowMinutes,
+    p_limit: input.limit,
+  });
 
   if (error) {
-    // Ne jamais bloquer un invité à cause d'un incident de mesure.
-    console.error('Dot RSVP rate limit read failed:', error.message);
-    return false;
+    console.error('Dot RSVP rate limit failed:', error.message);
+    throw new Error('RSVP_RATE_LIMIT_UNAVAILABLE');
   }
-  return (count ?? 0) >= input.limit;
-}
 
-export async function recordRateEvent(supabase: SupabaseClient, ipHash: string): Promise<void> {
-  const { error } = await supabase.from('rsvp_rate_events').insert({ ip_hash: ipHash });
-  if (error) console.error('Dot RSVP rate event insert failed:', error.message);
+  return data === true;
 }
-

@@ -36,10 +36,11 @@ describe('POST /api/rsvp/lookup — retrouver sa réponse pour la modifier', () 
     expect((await response.json()).code).toBe('invalid_phone');
   });
 
-  it('exige un nom valide : le numéro seul ne suffit jamais', async () => {
-    const response = await POST(request({ guestName: '', phone: '0700000000' }));
-    expect(response.status).toBe(400);
-    expect((await response.json()).code).toBe('invalid_name');
+  it('accepte le numéro seul comme identifiant de recherche', async () => {
+    const response = await POST(request({ phone: '0700000000' }));
+    // Le numéro est valide ; la route atteint ensuite le contrôle de configuration Supabase.
+    expect(response.status).toBe(503);
+    expect((await response.json()).code).toBe('unavailable');
   });
 
   it('signale l’indisponibilité du service sans rien révéler', async () => {

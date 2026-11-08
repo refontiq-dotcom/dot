@@ -122,20 +122,22 @@ describe('POST /api/rsvp — inscription simple, sans compte', () => {
 
 describe('POST /api/rsvp — modification d’une réponse', () => {
   it('valide les données avant de traiter une modification', async () => {
-    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi', phone: '0912345678' })));
+    const response = await POST(request(payload({ mode: 'update', phone: '0912345678' })));
     expect(response.status).toBe(400);
     expect((await response.json()).code).toBe('invalid_phone');
   });
 
   it('refuse toujours des proches pour une absence, même en modification', async () => {
-    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi', attending: false, companions: ['Jean Kouassi'] })));
+    const response = await POST(request(payload({ mode: 'update', attending: false, companions: ['Jean Kouassi'] })));
     expect(response.status).toBe(400);
     expect((await response.json()).code).toBe('invalid_companions');
   });
 
-  it('signale l’indisponibilité du service pour une modification', async () => {
-    const response = await POST(request(payload({ mode: 'update', originalGuestName: 'Marie Kouassi' })));
+  it('permet de demander une modification avec le téléphone seul', async () => {
+    const response = await POST(request(payload({ mode: 'update' })));
+    // La validation accepte la demande ; le service n'est pas configuré dans ce test.
     expect(response.status).toBe(503);
+    expect((await response.json()).code).toBe('unavailable');
   });
 });
 

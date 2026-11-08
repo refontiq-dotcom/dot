@@ -5,7 +5,6 @@ import {
   CalendarDays,
   MapPin,
   Megaphone,
-  Clock3,
   Heart,
   PartyPopper,
   House,
@@ -34,6 +33,18 @@ type RsvpReceipt = {
   updated: boolean;
   possibleDuplicate: boolean;
   status: 'accepted' | 'waitlisted' | 'declined' | 'review';
+};
+
+type RsvpLookup = {
+  guestName: string;
+  phoneNormalized: string;
+  attending: boolean;
+  companions: string[];
+  companionCount: number;
+  personCount: number;
+  maxCompanions: number;
+  status: 'accepted' | 'waitlisted' | 'declined' | 'review';
+  venueDetails?: { venue?: string; venue_detail?: string; map_url?: string; travel?: Content['travel'] };
 };
 
 function Calendar() {
@@ -70,18 +81,21 @@ export default function Home() {
   const [website, setWebsite] = useState('');
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [editOriginalName, setEditOriginalName] = useState('');
   const [maxCompanions, setMaxCompanions] = useState(MAX_COMPANIONS);
   const [lookupBusy, setLookupBusy] = useState(false);
-  const [showTravelGuide, setShowTravelGuide] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupResult, setLookupResult] = useState<RsvpLookup | null>(null);
+  const [lookupStatus, setLookupStatus] = useState('');
+  const [lookupModalOpen, setLookupModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
   const modalRef = useRef<HTMLDivElement>(null);
+  const lookupModalRef = useRef<HTMLDivElement>(null);
+  const lookupCloseRef = useRef<HTMLButtonElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Une ancienne valeur de session ne constitue jamais une preuve de confirmation.
     try { window.sessionStorage.removeItem('dot-travel-guide-unlocked'); } catch {}
-    setShowTravelGuide(false);
   }, []);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
@@ -121,7 +135,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    const sections = ['accueil', 'annonces', 'programme', 'lieu', 'rsvp', 'faq']
+    const sections = ['accueil', 'annonces', 'programme', 'rsvp', 'faq']
       .map(id => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) return;
@@ -209,6 +223,7 @@ export default function Home() {
   const stamp = content.updatedAt
     ? new Date(content.updatedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
     : '';
+  const publicFaq = content.faq.filter(item => item.confirmed && item.detail.trim());
   const venueMapUrl = (() => {
     try {
       const parsed = new URL(content.mapUrl);
@@ -230,60 +245,52 @@ export default function Home() {
     setWebsite('');
     setRsvpStatus('');
     setEditMode(false);
-    setEditOriginalName('');
     setMaxCompanions(MAX_COMPANIONS);
   }
 
-  // Retrouve la réponse de l'invité (nom + numéro) pour la modifier.
-  async function startEdit() {
-    setRsvpStatus('');
-    const parsed = normalizeIvorianPhone(phone);
-    if (!parsed.ok) {
-      setRsvpStatus(parsed.error);
-      return;
-    }
-    if (guestName.trim().length < 2) {
-      setRsvpStatus('Indiquez votre nom et prénom, comme lors de votre première réponse.');
-      return;
-    }
+  // Retrouve la réponse déjà enregistrée à partir du numéro de téléphone.
+  async function findRsvp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLookupStatus('');
+    setLookupResult(null);
+    // Efface tout ancien lieu privé avant une nouvelle recherche.
+    setContent(current => ({ ...current, venue: '', venueDetail: '', mapUrl: '', travel: initialContent.travel }));
+    const parsed = normalizeIvorianPhone(lookupPhone);
+    if (!parsed.ok) { setLookupStatus(parsed.error); return; }
     setLookupBusy(true);
     try {
       const response = await fetch('/api/rsvp/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName, phone: parsed.normalized }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: parsed.normalized }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Réponse introuvable.');
-      const found: string[] = Array.isArray(result.companions) ? result.companions.map(String) : [];
-      setEditMode(true);
-      setEditOriginalName(String(result.guestName));
-      setGuestName(String(result.guestName));
-      setPhone(parsed.display);
-      setAttending(result.attending ? 'yes' : 'no');
-      setCompanions(result.attending ? found : []);
-      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, Math.min(found.length, MAX_COMPANIONS))));
-      if (result.status === 'accepted' && result.venueDetails) {
-        const details = result.venueDetails as Record<string, unknown>;
-        setContent(current => ({
-          ...current,
-          venue: String(details.venue ?? ''),
-          venueDetail: String(details.venue_detail ?? ''),
-          mapUrl: String(details.map_url ?? ''),
-          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
-        }));
-        setShowTravelGuide(true);
-      } else {
-        setShowTravelGuide(false);
-      }
-      setPendingRemoval(null);
+      const found: RsvpLookup = {
+        guestName: String(result.guestName), phoneNormalized: parsed.normalized,
+        attending: Boolean(result.attending),
+        companions: Array.isArray(result.companions) ? result.companions.map(String) : [],
+        companionCount: Number(result.companionCount) || 0, personCount: Number(result.personCount) || 0,
+        maxCompanions: Number(result.maxCompanions) || 0,
+        status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
+        ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
+      };
+      setLookupResult(found);
+      if (found.venueDetails) setContent(current => ({ ...current, venue: String(found.venueDetails?.venue ?? ''), venueDetail: String(found.venueDetails?.venue_detail ?? ''), mapUrl: String(found.venueDetails?.map_url ?? ''), travel: found.venueDetails?.travel ?? current.travel }));
     } catch (error) {
-      setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
-    } finally {
-      setLookupBusy(false);
-    }
+      setLookupStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
+    } finally { setLookupBusy(false); }
   }
 
+  // Ouvre le formulaire de modification existant avec les informations retrouvées.
+  function startEdit() {
+    if (!lookupResult) return;
+    setRsvpStatus(''); setEditMode(true);
+    setGuestName(lookupResult.guestName); setPhone(lookupResult.phoneNormalized);
+    setAttending(lookupResult.attending ? 'yes' : 'no');
+    setCompanions(lookupResult.attending ? [...lookupResult.companions] : []);
+    setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(lookupResult.maxCompanions, Math.min(lookupResult.companions.length, MAX_COMPANIONS))));
+    setPendingRemoval(null);
+  }
   function cancelEdit() {
     resetRsvpForm();
   }
@@ -365,7 +372,7 @@ export default function Home() {
           attending: attendingYes,
           companions: attendingYes ? companionNames : [],
           website,
-          ...(editMode ? { mode: 'update', originalGuestName: editOriginalName } : {}),
+          ...(editMode ? { mode: 'update' } : {}),
         }),
       });
       const result = await response.json();
@@ -390,11 +397,21 @@ export default function Home() {
         personCount: typeof result.personCount === 'number' ? result.personCount : 1,
         updated: Boolean(result.updated),
         possibleDuplicate: Boolean(result.possibleDuplicate),
-        status: result.status === 'review' ? 'review' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
+        status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
       });
 
-      const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
-      setShowTravelGuide(travelGuideUnlocked);
+      if (editMode) {
+        setLookupResult(current => current ? {
+          ...current,
+          guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
+          attending: attendingYes,
+          companions: attendingYes ? companionNames : [],
+          companionCount: attendingYes ? companionNames.length : 0,
+          personCount: typeof result.personCount === 'number' ? result.personCount : (attendingYes ? 1 + companionNames.length : 0),
+          status: result.status === 'accepted' ? 'accepted' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'review',
+          ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
+        } : current);
+      }
       resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -403,6 +420,48 @@ export default function Home() {
     }
   }
 
+  useEffect(() => {
+    if (!lookupModalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    lookupCloseRef.current?.focus();
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLookupModalOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lookupModalOpen]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('guest-name')?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setGuestName('');
+        setPhone('');
+        setAttending('yes');
+        setCompanions([]);
+        setPendingRemoval(null);
+        setWebsite('');
+        setRsvpStatus('');
+        setEditMode(false);
+        setMaxCompanions(MAX_COMPANIONS);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [editMode]);
+
   return (
     <>
       <a className="skip-link" href="#contenu">Aller au contenu principal</a>
@@ -410,13 +469,11 @@ export default function Home() {
         <div className="shell nav">
           <a href="#accueil" className="brand">F <span style={{ color: 'var(--accent)' }}>×</span> V</a>
           <nav className="navlinks" aria-label="Navigation principale">
-            {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
             <a href="#programme">Programme</a>
-            <a href="#lieu">Le lieu</a>
             <a href="#rsvp">Présence</a>
             <a href="#faq">Questions</a>
           </nav>
-          <a className="button small" href="#annonces">Dernières nouvelles <Megaphone size={16} /></a>
+
         </div>
       </header>
 
@@ -449,9 +506,7 @@ export default function Home() {
               </div>
               {countdown.state === 'past' && <p className="latest">La cérémonie a eu lieu le {formattedEventDate}.</p>}
               <div className="actions">
-                {content.pagne.enabled && <a className="button accent" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
                 <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
-                <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
               <div className="hero-links">
                 <a className="hero-link" href="#programme"><ListChecks size={17} /> Voir le programme de la journée</a>
@@ -461,102 +516,29 @@ export default function Home() {
           </div>
         </section>
 
-        {content.pagne.enabled && (
-          <section className="section" id="pagne">
-            <div className="shell pagne-section">
-              <div className="section-head" data-reveal>
-                <div className="eyebrow">Commande directe auprès des vendeurs</div>
-                <h2>Le pagne de la dot</h2>
-                <p>{content.pagne.description}</p>
-              </div>
-              <div className="pagne-card" data-reveal>
-                <div className="pagne-visual">
-                  {content.pagne.imageUrl
-                    ? <img src={content.pagne.imageUrl} alt="Pagne proposé pour la dot" />
-                    : <div className="pagne-placeholder"><ShoppingBag size={42}/><span>Photo du pagne à venir</span></div>}
-                </div>
-                <div className="pagne-details">
-                  <div className="eyebrow">Prix du morceau de pagne</div>
-                  <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA</div>
-                  <p>Choisissez un vendeur et contactez-le directement pour passer votre commande.</p>
-                  {content.pagne.contacts.length > 0 ? content.pagne.contacts.map((contact, index) => {
-                    const digits = contact.phone.replace(/\D/g, '');
-                    const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
-                    return <div className="pagne-seller" key={contact.id}>
-                      <strong>{contact.label.trim() || `Vendeur ${index + 1}`}</strong>
-                      <span>{contact.phone}</span>
-                      {digits.length >= 8 && <div className="pagne-actions">
-                        <a className="button" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={17}/> Appeler pour commander</a>
-                        <a className="button secondary" href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Commander sur WhatsApp</a>
-                      </div>}
-                    </div>;
-                  }) : <p className="notice">Les contacts des vendeurs seront bientôt affichés ici.</p>}
+        {content.announcement.trim() && !content.announcement.trim().toLowerCase().startsWith('bienvenue sur votre espace famille') && (
+          <section className="section soft" id="annonces">
+            <div className="shell">
+              <div className="section-head" data-reveal><div className="eyebrow">À lire en premier</div><h2>Information des familles</h2></div>
+              <div className="announcement" data-reveal>
+                <Megaphone size={24} style={{ flexShrink: 0, marginTop: 3 }} />
+                <div>
+                  <p>{content.announcement}</p>
+                  {stamp && <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>}
                 </div>
               </div>
             </div>
           </section>
         )}
 
-        <section className="section soft" id="annonces">
-          <div className="shell">
-            <div className="section-head" data-reveal><div className="eyebrow">À lire en premier</div><h2>La dernière nouvelle</h2></div>
-            <div className="announcement" data-reveal>
-              <Megaphone size={24} style={{ flexShrink: 0, marginTop: 3 }} />
-              <div>
-                <h3>Information des familles</h3>
-                <p>{content.announcement}</p>
-                {stamp && <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>}
-              </div>
-            </div>
-            <p className="latest"><Info size={14} style={{ verticalAlign: '-2px' }} /> Les détails encore en préparation sont indiqués « à confirmer ».</p>
-          </div>
-        </section>
-
         <section className="section" id="programme">
-          <div className="shell location">
+          <div className="shell">
             <div data-reveal>
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
               <p style={{ color: 'var(--muted)' }}>Voici le déroulé complet de la journée. Les horaires peuvent légèrement évoluer : revenez consulter cette page.</p>
-              <ProgramTimeline items={content.items.filter(item => !item.familyOnly)} />
+              <ProgramTimeline items={content.items.filter(item => !item.familyOnly && item.confirmed).map(item => ({ ...item, detail: '' }))} />
             </div>
-            <div className="card program-aside" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
-              <div className="iconbox"><Clock3 /></div>
-              <h3>Un programme qui évolue</h3>
-              <p>Revenez consulter cette page avant la cérémonie : les dernières précisions seront publiées ici par les familles.</p>
-              {stamp && <p className="latest">Dernière mise à jour : {stamp}</p>}
-            </div>
-          </div>
-        </section>
-
-        <section className="section soft" id="lieu">
-          <div className="shell location">
-            <div data-reveal>
-              <div className="eyebrow">Retrouvons-nous</div>
-              <h2>Comment venir ?</h2>
-              {showTravelGuide && content.venue ? (
-                <>
-                  <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
-                  <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-                  <div style={{ marginTop: 16 }}>
-                    <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
-                  </div>
-                  <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
-                </>
-              ) : (
-                <div className="card" style={{ marginTop: 24 }}>
-                  <div className="eyebrow">Informations pratiques</div>
-                  <h3>Le lieu sera communiqué après confirmation de votre présence.</h3>
-                  <p>Si vous avez déjà répondu, retrouvez votre réponse avec votre nom et votre numéro pour consulter les indications.</p>
-                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ou retrouver ma réponse</a>
-                </div>
-              )}
-            </div>
-            {showTravelGuide && content.venue ? (
-              <div className="mapbox" data-reveal>
-                <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
-              </div>
-            ) : <div className="mapbox" data-reveal><div><Lock size={30}/><p style={{margin:'8px 0 2px',fontWeight:700}}>Accès réservé</p><small>Les indications seront affichées après confirmation.</small></div></div>}
           </div>
         </section>
 
@@ -567,7 +549,7 @@ export default function Home() {
               <h2>Confirmer votre présence</h2>
               <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
             </div>
-            <form className="rsvp-form" onSubmit={submitRsvp} data-reveal>
+            <form className={'rsvp-form' + (editMode ? ' is-edit-modal' : '')} onSubmit={submitRsvp} data-reveal={editMode ? undefined : true} role={editMode ? 'dialog' : undefined} aria-modal={editMode ? true : undefined} aria-label={editMode ? 'Modifier ma présence' : undefined}>
               {editMode && (
                 <div className="rsvp-edit-banner" role="status">
                   <b>Vous modifiez votre réponse</b>
@@ -661,18 +643,59 @@ export default function Home() {
                 <button className="button" type="submit" disabled={rsvpBusy || lookupBusy}>
                   {rsvpBusy ? 'Envoi en cours…' : editMode ? 'Enregistrer mes modifications' : 'Envoyer ma réponse'}
                 </button>
-                {editMode ? (
-                  <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>
-                ) : (
-                  <button className="button secondary" type="button" onClick={() => void startEdit()} disabled={rsvpBusy || lookupBusy}>
-                    <Pencil size={17} /> {lookupBusy ? 'Recherche…' : 'Modifier ma réponse'}
-                  </button>
-                )}
+                {editMode && <button className="button secondary" type="button" onClick={cancelEdit} disabled={rsvpBusy}>Annuler</button>}
               </div>
-              {!editMode && <p className="rsvp-hint">Déjà répondu ? Entrez votre nom et votre numéro, puis touchez « Modifier ma réponse ».</p>}
+              {!editMode && <button type="button" className="button secondary rsvp-open-lookup" onClick={() => { setLookupStatus(''); setLookupModalOpen(true); }}><Pencil size={17} /> Déjà inscrit ?</button>}
               {rsvpStatus && <p className="rsvp-status" role="alert" aria-live="assertive">{rsvpStatus}</p>}
               <p className="rsvp-privacy">Votre numéro et votre réponse restent privés.</p>
             </form>
+            {lookupModalOpen && (
+              <div className="rsvp-modal-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLookupModalOpen(false); }}>
+                <section className="rsvp-lookup-card rsvp-lookup-modal" role="dialog" aria-modal="true" aria-labelledby="rsvp-lookup-title" ref={lookupModalRef}>
+                  <button type="button" className="rsvp-modal-close" ref={lookupCloseRef} onClick={() => setLookupModalOpen(false)} aria-label="Fermer la fenêtre">×</button>
+                  <div className="eyebrow">Vous avez déjà répondu ?</div>
+                  <h3 id="rsvp-lookup-title">Retrouver mon inscription</h3>
+                  <p>Entrez le numéro de téléphone utilisé lors de votre inscription pour retrouver votre réponse et les informations réservées aux invités confirmés.</p>
+                  <form className="rsvp-lookup-form" onSubmit={findRsvp}>
+                    <label htmlFor="lookup-phone">Votre numéro de téléphone</label>
+                    <input id="lookup-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} required value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} placeholder="Ex. : 07 00 00 00 00" />
+                    <button className="button" type="submit" disabled={lookupBusy}>{lookupBusy ? 'Recherche…' : 'Retrouver ma réponse'}</button>
+                  </form>
+                  {lookupStatus && <p className="rsvp-status" role="alert">{lookupStatus}</p>}
+                  {lookupResult && (
+                    <div className="rsvp-lookup-result" aria-live="polite">
+                      <div className="rsvp-lookup-result-head">
+                        <div><span className="eyebrow">Votre réponse</span><h3>{lookupResult.guestName}</h3></div>
+                        <span className={'rsvp-lookup-status ' + lookupResult.status}>{lookupResult.status === 'accepted' ? 'Présence confirmée' : lookupResult.status === 'waitlisted' ? 'En liste d’attente' : lookupResult.status === 'review' ? 'À vérifier' : 'Absence enregistrée'}</span>
+                      </div>
+                      <p>{lookupResult.status === 'accepted' ? 'Votre groupe compte ' + lookupResult.personCount + ' personne' + (lookupResult.personCount > 1 ? 's' : '') + '.' : lookupResult.status === 'waitlisted' ? 'Votre demande est enregistrée. Les familles vous informeront si une place se libère.' : lookupResult.status === 'review' ? 'Votre demande doit encore être vérifiée par les familles.' : 'Votre absence a bien été enregistrée.'}</p>
+                      {lookupResult.attending && lookupResult.companions.length > 0 && <p className="rsvp-lookup-names"><strong>Personnes déclarées :</strong> {lookupResult.guestName}, {lookupResult.companions.join(', ')}</p>}
+                      {lookupResult.status === 'accepted' && lookupResult.venueDetails && (
+                        <div className="rsvp-private-details">
+                          <div className="eyebrow">Informations réservées aux invités confirmés</div>
+                          <h4><MapPin size={18} /> {content.venue || 'Votre lieu de réception'}</h4>
+                          {content.venueDetail && <p>{content.venueDetail}</p>}
+                          {venueMapUrl && <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
+                          <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+                        </div>
+                      )}
+                      {lookupResult.status === 'accepted' && content.pagne.enabled && (
+                        <div className="rsvp-private-pagne">
+                          <div className="eyebrow"><ShoppingBag size={16} /> Pagne officiel</div>
+                          <p>Vous souhaitez commander le pagne de la dot ? Contactez directement la vendeuse.</p>
+                          <strong>{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA le morceau</strong>
+                          <div className="pagne-actions">
+                            <a className="button" href={pagneWhatsAppUrl('+225 0501190633', lookupResult.guestName, lookupResult.personCount, content.pagne.contacts[0]?.label || 'Madame Traoré', Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Commander sur WhatsApp</a>
+                            <a className="button secondary" href="tel:+2250501190633"><Phone size={17} /> Appeler</a>
+                          </div>
+                        </div>
+                      )}
+                      <div className="rsvp-lookup-actions"><button type="button" className="button" onClick={() => { setLookupModalOpen(false); startEdit(); }}><Pencil size={17} /> Modifier ma présence</button></div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
           </div>
         </section>
 
@@ -681,15 +704,26 @@ export default function Home() {
             <div className="section-head" data-reveal>
               <div className="eyebrow">Besoin d’un renseignement ?</div>
               <h2>Questions fréquentes</h2>
-              <p>Les réponses sont ajoutées au fil des confirmations des familles.</p>
+              <p>Les informations utiles pour votre journée.</p>
             </div>
             <div className="faq">
-              {content.faq.map(item => (
+              {publicFaq.length > 0 ? publicFaq.map(item => (
                 <details key={item.id} data-reveal>
-                  <summary>{item.title}{!item.confirmed && <span className="tag" style={{ marginLeft: 8 }}>À confirmer</span>}</summary>
+                  <summary>{item.title}</summary>
                   <p>{item.detail}</p>
                 </details>
-              ))}
+              )) : (
+                <>
+                  <details data-reveal>
+                    <summary>J’ai déjà répondu. Comment retrouver les informations ?</summary>
+                    <p>Appuyez sur le bouton « Déjà inscrit ? » sous le formulaire, puis saisissez le numéro utilisé lors de votre inscription.</p>
+                  </details>
+                  <details data-reveal>
+                    <summary>Où trouver le lieu de la célébration ?</summary>
+                    <p>Le lieu et l’itinéraire sont réservés aux invités dont la présence est confirmée. Retrouvez votre réponse avec votre numéro de téléphone.</p>
+                  </details>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -714,7 +748,6 @@ export default function Home() {
       <nav className="mobile-nav" aria-label="Navigation rapide">
         <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
         <a href="#programme" aria-current={activeSection === 'programme' ? 'location' : undefined}><ListChecks /><span>Programme</span></a>
-        <a href="#lieu" aria-current={activeSection === 'lieu' ? 'location' : undefined}><MapPin /><span>Lieu</span></a>
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
       </nav>
@@ -766,13 +799,13 @@ export default function Home() {
                       {content.pagne.contacts.map((contact, index) => {
                         const digits = contact.phone.replace(/\D/g, '');
                         const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
-                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
+                        const whatsappUrl = pagneWhatsAppUrl('+225 0501190633', rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
                         return digits.length >= 8 ? (
                           <div className="modal-pagne-contact" key={contact.id}>
                             <span>Contact : <strong>{sellerName}</strong></span>
                             <div className="modal-pagne-actions">
                               <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Commander sur WhatsApp</a>
-                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} /> Appeler</a>
+                              <a className="button secondary" href="tel:+2250501190633"><Phone size={16} /> Appeler</a>
                             </div>
                           </div>
                         ) : null;
@@ -782,16 +815,7 @@ export default function Home() {
                 )}
                 <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() => {
-                      setRsvpReceipt(null);
-                      window.setTimeout(() => document.getElementById('lieu')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-                    }}
-                  >
-                    <Navigation size={17} /> Voir comment venir
-                  </button>
+                  {venueMapUrl && <a className="button" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
                   <button type="button" className="button secondary" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button>
                 </div>
               </>
