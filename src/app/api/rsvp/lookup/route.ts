@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   if (!supabase) return jsonError('Le service de confirmation est momentanément indisponible.', 503, 'unavailable');
 
   const ipHash = hashIp(clientIp(request.headers));
-  if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.savePerHourPerIp })) {
+  if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.lookupPerHourPerIp })) {
     return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
   }
   await recordRateEvent(supabase, ipHash);
