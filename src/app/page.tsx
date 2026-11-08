@@ -433,7 +433,6 @@ export default function Home() {
         setWebsite('');
         setRsvpStatus('');
         setEditMode(false);
-        setEditOriginalName('');
         setMaxCompanions(MAX_COMPANIONS);
       }
     };
