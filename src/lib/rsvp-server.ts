@@ -2,7 +2,6 @@
 import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { namesMayReferToSamePerson } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
