@@ -11,9 +11,9 @@ const ADMIN_EMAIL = 'refontiq@gmail.com';
 const plain = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const phoneDigits = (phone: string) => { const d = phone.replace(/\D/g, ''); return d.length === 10 ? `225${d}` : d; };
 type Companion = { id: string; full_name: string; position: number };
-type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; attendance_status?: 'accepted' | 'waitlisted' | 'declined'; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
+type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; attendance_status?: 'accepted' | 'waitlisted' | 'declined' | 'review'; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
 type GuestFilter = 'all' | 'yes' | 'no' | 'waitlisted' | 'check';
-type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; status: 'accepted' | 'waitlisted' | 'declined'; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
+type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; status: 'accepted' | 'waitlisted' | 'declined' | 'review'; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
 type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
@@ -59,6 +59,19 @@ export default function AdminPage() {
     finally{setBusy(false);}
   }
   async function logout(){await getSupabase().auth.signOut();setLogged(false);setGuests([]);}
+  async function resolveReview(id:string,decision:'accepted'|'declined'){
+    setNotice('');
+    try{
+      const {data}=await getSupabase().auth.getSession();
+      const token=data.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const response=await fetch('/api/admin/rsvp-review',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({id,decision})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Impossible de traiter cette demande.');
+      await refresh();
+      setNotice(result.status==='waitlisted'?'Demande validée, mais le groupe est placé en attente faute de places disponibles.':decision==='accepted'?'Demande vérifiée : invitation confirmée.':'Demande vérifiée : invitation refusée.');
+    }catch(e){setNotice(e instanceof Error?e.message:'Impossible de traiter cette demande.');}
+  }
   function field<K extends keyof Content>(key:K,value:Content[K]){setContent(v=>({...v,[key]:value}));}
   function setTravel(patch:Partial<Content['travel']>){setContent(v=>({...v,travel:{...v.travel,...patch}}));}
   function editBusLine(i:number,patch:Partial<Content['travel']['busLines'][number]>){setContent(v=>({...v,travel:{...v.travel,busLines:v.travel.busLines.map((l,n)=>n===i?{...l,...patch}:l)}}));}
@@ -119,20 +132,20 @@ export default function AdminPage() {
     return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(n=>{const ids=owners.get(normalizeNameKey(n));return Boolean(ids&&ids.size>1);})}));
   },[guests]);
   const searchTerm=plain(search.trim());
-  const counts={all:groups.length,yes:groups.filter(g=>g.status==='accepted').length,no:groups.filter(g=>g.status==='declined').length,waitlisted:groups.filter(g=>g.status==='waitlisted').length,check:groups.filter(g=>g.duplicates.length>0).length};
+  const counts={all:groups.length,yes:groups.filter(g=>g.status==='accepted').length,no:groups.filter(g=>g.status==='declined').length,waitlisted:groups.filter(g=>g.status==='waitlisted').length,check:groups.filter(g=>g.status==='review'||g.duplicates.length>0).length};
   const shown=useMemo(()=>groups.filter(g=>{
     if(searchTerm&&![g.name,...g.companions].some(n=>plain(n).includes(searchTerm)))return false;
     if(filter==='yes')return g.confirmed;
     if(filter==='no')return g.status==='declined';
     if(filter==='waitlisted')return g.status==='waitlisted';
-    if(filter==='check')return g.duplicates.length>0;
+    if(filter==='check')return g.status==='review'||g.duplicates.length>0;
     return true;
   }),[groups,searchTerm,filter]);
   function exportCsv(){
     const day=(v:string)=>new Date(v).toLocaleDateString('fr-FR');
     const rows=[['Nom','Invité ou proche','Venu(e) avec','Téléphone','Réponse','Personnes dans le groupe','Répondu le'],
       ...shown.flatMap(g=>{
-        const answer=g.status==='accepted'?'Présent(e)':g.status==='waitlisted'?'En attente':'Absent(e)',size=g.status==='accepted'?String(g.size):'0';
+        const answer=g.status==='accepted'?'Présent(e)':g.status==='waitlisted'?'En attente':g.status==='review'?'À vérifier':'Absent(e)',size=g.status==='accepted'?String(g.size):'0';
         return [[g.name,'Invité','',g.phone??'',answer,size,day(g.createdAt)],
           ...g.companions.map(n=>[n,'Proche',g.name,'',answer,size,day(g.createdAt)]),
           ...(g.unnamed>0?[[`${g.unnamed} proche${g.unnamed>1?'s':''} (nom non donné)`,'Proche',g.name,'',answer,size,day(g.createdAt)]]:[])];
@@ -264,9 +277,10 @@ export default function AdminPage() {
         <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],['waitlisted','En attente',counts.waitlisted],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
         <ul className="admin-guest-list">
           {shown.map(g=>{const digits=g.phone?phoneDigits(g.phone):'';return <li className="admin-guest-card" key={g.id}>
-            <div className="admin-guest-top"><b>{g.name}</b><span className={g.status==='accepted'?'admin-status yes':g.status==='waitlisted'?'admin-status':'admin-status no'}>{g.status==='accepted'?'Vient':g.status==='waitlisted'?'En attente':'Ne vient pas'}</span></div>
-            {(g.status==='accepted'||g.status==='waitlisted')&&<p className="admin-guest-line"><Users size={16}/><span>{g.status==='waitlisted'?'Groupe en attente · ':''}{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
-            {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> WhatsApp</a></div>}
+            <div className="admin-guest-top"><b>{g.name}</b><span className={g.status==='accepted'?'admin-status yes':g.status==='waitlisted'?'admin-status':g.status==='review'?'admin-status review':'admin-status no'}>{g.status==='accepted'?'Vient':g.status==='waitlisted'?'En attente':g.status==='review'?'À vérifier':'Ne vient pas'}</span></div>
+            {(g.status==='accepted'||g.status==='waitlisted'||g.status==='review')&&<p className="admin-guest-line"><Users size={16}/><span>{g.status==='waitlisted'?'Groupe en attente · ':g.status==='review'?'Groupe non confirmé · ':''}{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
+            {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={g.status==='review'? `https://wa.me/${digits}?text=${encodeURIComponent(`Bonjour ${g.name}, votre demande de présence à la dot de ${content.groomName} et ${content.brideName} a bien été reçue. Toutefois, votre nom semble déjà figurer dans notre liste d’invités. Afin de vérifier qu’il ne s’agit pas d’un doublon, pouvez-vous nous confirmer qu’il s’agit bien de votre première inscription ? Merci, les familles.`) }` : `https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> {g.status==='review'?'Contacter sur WhatsApp':'WhatsApp'}</a></div>}
+            {g.status==='review'&&<div className="admin-guest-actions"><button className="button small" onClick={()=>void resolveReview(g.id,'accepted')}>Confirmer l’invitation</button><button className="button secondary small" onClick={()=>void resolveReview(g.id,'declined')}>Refuser après vérification</button></div>}
             {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
             <p className="admin-guest-date">Répondu le {new Date(g.createdAt).toLocaleDateString('fr-FR')}{g.updatedAt&&g.updatedAt!==g.createdAt&&` · modifié le ${new Date(g.updatedAt).toLocaleDateString('fr-FR')}`}</p>
           </li>;})}
