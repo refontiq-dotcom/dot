@@ -27,7 +27,6 @@ type RsvpPayload = {
   companions?: unknown;
   website?: unknown;
   mode?: unknown;
-  originalGuestName?: unknown;
 };
 
 function json(payload: Record<string, unknown>, status = 200) {
@@ -84,25 +83,33 @@ export async function POST(request: NextRequest) {
   }
 
   const ipHash = hashIp(clientIp(request.headers));
-  if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.savePerHourPerIp })) {
-    return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
+  try {
+    if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.savePerHourPerIp })) {
+      return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
+    }
+    // Enregistre aussi les tentatives qui échouent ensuite dans la validation métier.
+    await recordRateEvent(supabase, ipHash);
+  } catch {
+    return jsonError('Le service est momentanément indisponible. Veuillez réessayer plus tard.', 503, 'rate_limit_unavailable');
   }
 
-  // Modification d'une réponse existante : il faut connaître le numéro ET le nom d'origine.
+  // Le téléphone est le seul identifiant demandé pour retrouver et modifier une réponse.
   const updating = body.mode === 'update';
   if (updating) {
-    const originalKey = typeof body.originalGuestName === 'string' ? normalizeNameKey(cleanPersonName(body.originalGuestName)) : '';
     const { data: existing, error: lookupError } = await supabase
       .from('rsvp_responses')
-      .select('guest_name')
+      .select('id')
       .eq('phone_normalized', phone.normalized)
-      .maybeSingle();
+      .limit(2);
     if (lookupError) {
-      console.error('Dot RSVP lookup failed:', lookupError.message);
-      return jsonError('Votre réponse n’a pas pu être enregistrée. Veuillez réessayer.', 500);
+      console.error('Dot RSVP update lookup failed:', lookupError.message);
+      return jsonError('Votre réponse n’a pas pu être vérifiée. Veuillez réessayer.', 500);
     }
-    if (!existing || !originalKey || normalizeNameKey(String(existing.guest_name)) !== originalKey) {
-      return jsonError('Nous ne trouvons pas votre réponse avec ce nom et ce numéro.', 404, 'not_found');
+    if (!existing?.length) {
+      return jsonError('Aucune réponse ne correspond à ce numéro.', 404, 'not_found');
+    }
+    if (existing.length > 1) {
+      return jsonError('Plusieurs réponses sont associées à ce numéro. Contactez les familles pour retrouver la bonne réponse.', 409, 'multiple_responses');
     }
   }
 
@@ -146,12 +153,13 @@ export async function POST(request: NextRequest) {
     return jsonError('Votre réponse n’a pas pu être enregistrée. Veuillez réessayer.', 500);
   }
 
-  await recordRateEvent(supabase, ipHash);
-
   const saved = Array.isArray(data) ? data[0] : data;
   const companionCount = companions.names.length;
   const created = saved?.saved_created !== false;
-  const status = saved?.saved_status === 'review' ? 'review' : saved?.saved_status === 'waitlisted' ? 'waitlisted' : saved?.saved_status === 'declined' ? 'declined' : 'accepted';
+  const status = saved?.saved_status === 'accepted' ? 'accepted'
+    : saved?.saved_status === 'waitlisted' ? 'waitlisted'
+    : saved?.saved_status === 'declined' ? 'declined'
+    : 'review';
   let venueDetails: Record<string, unknown> | null = null;
   if (status === 'accepted') {
     const { data: details, error: detailsError } = await supabase
