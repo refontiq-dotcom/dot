@@ -16,11 +16,11 @@ export default function TravelGuide({ travel, mapUrl }: { travel: TravelContent;
   const [mode, setMode] = useState<Mode>('bus');
   const lines = travel.busLines.filter(line => line.number.trim());
 
-  const mapsButton = (
+  const mapsButton = mapUrl ? (
     <a href={mapUrl} target="_blank" rel="noreferrer" className="button">
       <Navigation size={17} /> Ouvrir l’itinéraire Google Maps
     </a>
-  );
+  ) : null;
 
   return (
     <div className="travel-guide" aria-live="polite">
