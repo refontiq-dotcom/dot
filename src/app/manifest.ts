@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     name: 'Dot',
     short_name: 'Dot',
-    description: 'Le programme, le lieu et toutes les informations de la dot, sur votre téléphone.',
+    description: 'Le programme et les informations pratiques de la dot, sur votre téléphone.',
     lang: 'fr',
     dir: 'ltr',
     start_url: '/',
@@ -23,7 +23,6 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: 'Programme de la journée', short_name: 'Programme', url: '/#programme', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
       { name: 'Confirmer ma présence', short_name: 'Présence', url: '/#rsvp', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
-      { name: 'Le lieu', short_name: 'Lieu', url: '/#lieu', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
     ],
   };
 }
