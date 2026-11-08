@@ -148,6 +148,16 @@ export async function POST(request: NextRequest) {
   const companionCount = companions.names.length;
   const created = saved?.saved_created !== false;
   const status = saved?.saved_status === 'waitlisted' ? 'waitlisted' : saved?.saved_status === 'declined' ? 'declined' : 'accepted';
+  let venueDetails: Record<string, unknown> | null = null;
+  if (status === 'accepted') {
+    const { data: details, error: detailsError } = await supabase
+      .from('private_event_details')
+      .select('venue, venue_detail, map_url, travel')
+      .eq('id', 'main')
+      .maybeSingle();
+    if (detailsError) console.error('Dot private venue read failed:', detailsError.message);
+    else if (details) venueDetails = details as Record<string, unknown>;
+  }
 
   return json(
     {
@@ -159,6 +169,7 @@ export async function POST(request: NextRequest) {
       personCount: groupSize(attending, companionCount),
       possibleDuplicate,
       status,
+      ...(venueDetails ? { venueDetails } : {}),
       updatedAt: saved?.saved_updated_at ?? new Date().toISOString(),
     },
     created ? 201 : 200,
