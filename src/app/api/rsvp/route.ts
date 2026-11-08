@@ -108,8 +108,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Même numéro = même inscription, mais on ne la modifie que sur demande explicite (mode « update »).
-  const nameKeys = [normalizeNameKey(guestName), ...companions.keys].filter(Boolean);
-  const possibleDuplicate = await detectDuplicateNames(supabase, nameKeys, phone.normalized);
+  const possibleDuplicate = await detectDuplicateNames(supabase, [guestName, ...companions.names], phone.normalized);
+  if (possibleDuplicate) {
+    return jsonError(
+      'Une inscription avec un nom très proche existe déjà. Pour éviter un doublon, contactez les familles avant de réessayer.',
+      409,
+      'possible_duplicate_name',
+    );
+  }
 
   const { data, error } = await supabase.rpc('save_rsvp', {
     p_phone: phone.display,
@@ -123,6 +129,13 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     const message = error.message ?? '';
+    if (message.includes('possible_duplicate_name')) {
+      return jsonError(
+        'Une inscription avec un nom très proche existe déjà. Pour éviter un doublon, contactez les familles avant de réessayer.',
+        409,
+        'possible_duplicate_name',
+      );
+    }
     if (message.includes('already_registered')) {
       return jsonError('Vous êtes déjà sur la liste des invités. Pour changer votre réponse, touchez « Modifier ma réponse ».', 409, 'already_registered');
     }
