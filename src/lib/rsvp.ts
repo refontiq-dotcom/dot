@@ -1,7 +1,7 @@
 // Logique RSVP partagée entre le navigateur et le serveur.
 // Aucun secret, aucune dépendance Node : ce module doit rester importable côté client.
 
-export const MAX_COMPANIONS = 9;
+export const MAX_COMPANIONS = 2;
 export const MAX_GROUP_SIZE = MAX_COMPANIONS + 1;
 
 // Préfixes ivoiriens à 10 chiffres : mobiles (01, 05, 07) et fixes (21, 22, 23, 25, 27).
