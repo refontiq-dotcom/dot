@@ -19,8 +19,8 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/couple-frederic-vanessa.jpg', sizes: '1000x1000', type: 'image/jpeg', purpose: 'any' },
     ],
     shortcuts: [
-      { name: 'Programme de la journée', short_name: 'Programme', url: '/#programme', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
-      { name: 'Confirmer ma présence', short_name: 'Présence', url: '/#rsvp', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'Programme de la journée', short_name: 'Programme', url: '/#programme', icons: [{ src: '/couple-frederic-vanessa.jpg', sizes: '192x192', type: 'image/png' }] },
+      { name: 'Confirmer ma présence', short_name: 'Présence', url: '/#rsvp', icons: [{ src: '/couple-frederic-vanessa.jpg', sizes: '192x192', type: 'image/png' }] },
     ],
   };
 }
