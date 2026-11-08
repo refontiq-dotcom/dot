@@ -37,7 +37,7 @@ export const initialContent: Content = {
     price: 2500,
     description: 'Le pagne de la dot est disponible auprès des vendeurs indiqués. Contactez directement le vendeur de votre choix pour commander.',
     imageUrl: '',
-    contacts: [{ id: 'vendeuse-madame-raoui-0759698321', label: 'Madame Raoui', phone: '0759698321' }],
+    contacts: [{ id: 'vendeuse-madame-traore-0759698321', label: 'Madame Traoré', phone: '0759698321' }],
   },
   announcement: 'Bienvenue sur votre espace famille. Les prochaines informations seront partagées ici.',
   items: [
