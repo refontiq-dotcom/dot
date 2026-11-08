@@ -791,16 +791,7 @@ export default function Home() {
                 )}
                 <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() => {
-                      setRsvpReceipt(null);
-                      window.setTimeout(() => document.getElementById('lieu')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-                    }}
-                  >
-                    <Navigation size={17} /> Voir comment venir
-                  </button>
+                  {venueMapUrl && <a className="button" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
                   <button type="button" className="button secondary" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button>
                 </div>
               </>
