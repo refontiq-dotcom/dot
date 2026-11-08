@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
   const saved = Array.isArray(data) ? data[0] : data;
   const companionCount = companions.names.length;
   const created = saved?.saved_created !== false;
+  const status = saved?.saved_status === 'waitlisted' ? 'waitlisted' : saved?.saved_status === 'declined' ? 'declined' : 'accepted';
 
   return json(
     {
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
       companionCount,
       personCount: groupSize(attending, companionCount),
       possibleDuplicate,
+      status,
       updatedAt: saved?.saved_updated_at ?? new Date().toISOString(),
     },
     created ? 201 : 200,
