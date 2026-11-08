@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { normalizeNameKey } from '@/lib/rsvp';
+import { namesMayReferToSamePerson } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
@@ -69,20 +69,20 @@ export async function recordRateEvent(supabase: SupabaseClient, ipHash: string):
 }
 
 /**
- * Signale un nom déjà présent dans un autre groupe.
- * Simple avertissement : aucune fusion, aucun blocage. En cas d'erreur, on n'avertit pas.
+ * Détecte un nom déjà présent dans un autre groupe, y compris les noms abrégés,
+ * les accents et les variantes courantes. Les compagnons du dossier en cours
+ * de modification sont exclus. La base applique la même règle en dernier recours.
  */
 export async function detectDuplicateNames(
   supabase: SupabaseClient,
-  keys: string[],
+  names: string[],
   excludePhone: string,
 ): Promise<boolean> {
-  if (keys.length === 0) return false;
-  const targets = new Set(keys);
+  if (names.length === 0) return false;
 
   const [principals, companions] = await Promise.all([
-    supabase.from('rsvp_responses').select('guest_name, phone_normalized'),
-    supabase.from('rsvp_companions').select('name_normalized'),
+    supabase.from('rsvp_responses').select('id, guest_name, phone_normalized'),
+    supabase.from('rsvp_companions').select('rsvp_id, full_name'),
   ]);
 
   if (principals.error || companions.error) {
@@ -90,14 +90,14 @@ export async function detectDuplicateNames(
     return false;
   }
 
-  for (const row of (principals.data ?? []) as { guest_name: string; phone_normalized: string | null }[]) {
-    if (row.phone_normalized && row.phone_normalized === excludePhone) continue;
-    if (targets.has(normalizeNameKey(row.guest_name))) return true;
-  }
+  const principalRows = (principals.data ?? []) as { id: string; guest_name: string; phone_normalized: string | null }[];
+  const excludedIds = new Set(principalRows.filter(row => row.phone_normalized === excludePhone).map(row => row.id));
+  const existingNames = [
+    ...principalRows.filter(row => !excludedIds.has(row.id)).map(row => row.guest_name),
+    ...((companions.data ?? []) as { rsvp_id: string; full_name: string }[])
+      .filter(row => !excludedIds.has(row.rsvp_id))
+      .map(row => row.full_name),
+  ];
 
-  for (const row of (companions.data ?? []) as { name_normalized: string }[]) {
-    if (targets.has(row.name_normalized)) return true;
-  }
-
-  return false;
+  return names.some(incoming => existingNames.some(existing => namesMayReferToSamePerson(incoming, existing)));
 }
