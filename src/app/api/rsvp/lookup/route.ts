@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeIvorianPhone, normalizeNameKey, validateGuestName } from '@/lib/rsvp';
+import { normalizeIvorianPhone } from '@/lib/rsvp';
 import {
   NO_STORE,
   RATE_LIMITS,
@@ -13,7 +13,7 @@ import {
 
 export const runtime = 'nodejs';
 
-type LookupPayload = { guestName?: unknown; phone?: unknown };
+type LookupPayload = { phone?: unknown };
 
 function json(payload: Record<string, unknown>, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE });
@@ -23,11 +23,11 @@ function jsonError(message: string, status: number, code?: string) {
   return json({ error: message, ...(code ? { code } : {}) }, status);
 }
 
-const NOT_FOUND = 'Nous ne trouvons pas de réponse avec ce nom et ce numéro. Vérifiez-les, ou touchez « Envoyer ma réponse » si c’est votre première réponse.';
+const NOT_FOUND = 'Aucune réponse ne correspond à ce numéro. Vérifiez le numéro utilisé lors de votre inscription.';
 
 /**
- * Retrouve la réponse d'un invité pour la modifier.
- * Le numéro ET le nom doivent correspondre : sinon rien n'est révélé.
+ * Retrouve une réponse à partir du numéro communiqué lors de l'inscription.
+ * Si plusieurs réponses partagent le même numéro, aucune donnée n'est révélée.
  */
 export async function POST(request: NextRequest) {
   if (!requestOriginAllowed(request)) return jsonError('Requête non autorisée.', 403);
@@ -44,9 +44,6 @@ export async function POST(request: NextRequest) {
 
   const phone = normalizeIvorianPhone(body.phone);
   if (!phone.ok) return jsonError(phone.error, 400, 'invalid_phone');
-  const nameError = validateGuestName(body.guestName);
-  if (nameError) return jsonError(nameError, 400, 'invalid_name');
-  const nameKey = normalizeNameKey(String(body.guestName));
 
   const supabase = getAdminClient();
   if (!supabase) return jsonError('Le service de confirmation est momentanément indisponible.', 503, 'unavailable');
@@ -57,19 +54,21 @@ export async function POST(request: NextRequest) {
   }
   await recordRateEvent(supabase, ipHash);
 
-  const { data: row, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('rsvp_responses')
     .select('id, guest_name, confirmed, max_companions, attendance_status')
     .eq('phone_normalized', phone.normalized)
-    .maybeSingle();
+    .limit(2);
   if (error) {
     console.error('Dot RSVP lookup failed:', error.message);
     return jsonError('Votre réponse n’a pas pu être retrouvée. Veuillez réessayer.', 500);
   }
-  if (!row || normalizeNameKey(String(row.guest_name)) !== nameKey) {
-    return jsonError(NOT_FOUND, 404, 'not_found');
+  if (!rows?.length) return jsonError(NOT_FOUND, 404, 'not_found');
+  if (rows.length > 1) {
+    return jsonError('Plusieurs réponses sont associées à ce numéro. Contactez les familles pour retrouver la bonne réponse.', 409, 'multiple_responses');
   }
 
+  const row = rows[0];
   const { data: companionRows, error: companionError } = await supabase
     .from('rsvp_companions')
     .select('full_name, position')
@@ -80,8 +79,9 @@ export async function POST(request: NextRequest) {
     return jsonError('Votre réponse n’a pas pu être retrouvée. Veuillez réessayer.', 500);
   }
 
+  const status = row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined');
   let venueDetails: Record<string, unknown> | null = null;
-  if (row.attendance_status === 'accepted') {
+  if (status === 'accepted') {
     const { data: details, error: detailsError } = await supabase
       .from('private_event_details')
       .select('venue, venue_detail, map_url, travel')
@@ -94,10 +94,12 @@ export async function POST(request: NextRequest) {
   return json({
     ok: true,
     guestName: row.guest_name,
-    attending: row.attendance_status ? row.attendance_status !== 'declined' : row.confirmed === true,
+    attending: status !== 'declined',
     companions: (companionRows ?? []).map(c => String(c.full_name)),
+    companionCount: (companionRows ?? []).length,
+    personCount: status === 'declined' ? 0 : 1 + (companionRows ?? []).length,
     maxCompanions: Number(row.max_companions ?? 0),
-    status: row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined'),
+    status,
     ...(venueDetails ? { venueDetails } : {}),
   });
 }
