@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
-import { declaredGroupSize, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
+import { declaredGroupSize, namesMayReferToSamePerson, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
 import { formatRange, sortByTime } from '@/lib/program';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
@@ -126,10 +126,10 @@ export default function AdminPage() {
       const size=status==='declined'?0:Math.max(Number(g.person_count)||0,companions.length+1);
       return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:status==='accepted',status,size,companions,unnamed:status==='accepted'?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
     });
-    // Un nom présent dans deux réponses différentes est signalé, jamais fusionné.
-    const owners=new Map<string,Set<string>>();
-    for(const g of list)for(const n of [g.name,...g.companions]){const k=normalizeNameKey(n);if(!k)continue;const ids=owners.get(k)??new Set<string>();ids.add(g.id);owners.set(k,ids);}
-    return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(n=>{const ids=owners.get(normalizeNameKey(n));return Boolean(ids&&ids.size>1);})}));
+    // Les ressemblances entre groupes sont signalées sans fusion ni modification automatique.
+    return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(name=>
+      list.some(other=>other.id!==g.id&&[other.name,...other.companions].some(candidate=>namesMayReferToSamePerson(name,candidate)))
+    )}));
   },[guests]);
   const searchTerm=plain(search.trim());
   const counts={all:groups.length,yes:groups.filter(g=>g.status==='accepted').length,no:groups.filter(g=>g.status==='declined').length,waitlisted:groups.filter(g=>g.status==='waitlisted').length,check:groups.filter(g=>g.status==='review'||g.duplicates.length>0).length};
