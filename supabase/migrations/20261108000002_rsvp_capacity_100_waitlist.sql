@@ -20,18 +20,6 @@ alter table public.rsvp_responses
   add constraint rsvp_responses_attendance_status_check
   check (attendance_status in ('accepted', 'waitlisted', 'declined'));
 
-alter table public.rsvp_responses
-  drop constraint if exists rsvp_responses_max_companions_check;
-alter table public.rsvp_responses
-  add constraint rsvp_responses_max_companions_check
-  check (max_companions >= 0 and max_companions <= 2);
-
-alter table public.rsvp_companions
-  drop constraint if exists rsvp_companions_position_check;
-alter table public.rsvp_companions
-  add constraint rsvp_companions_position_check
-  check (position between 1 and 2);
-
 create index if not exists rsvp_responses_capacity_queue_idx
   on public.rsvp_responses (attendance_status, created_at, id);
 
