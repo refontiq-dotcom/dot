@@ -37,6 +37,7 @@ type RsvpReceipt = {
 
 type RsvpLookup = {
   guestName: string;
+  phoneNormalized: string;
   attending: boolean;
   companions: string[];
   companionCount: number;
@@ -249,6 +250,8 @@ export default function Home() {
     event.preventDefault();
     setLookupStatus('');
     setLookupResult(null);
+    // Efface tout ancien lieu privé avant une nouvelle recherche.
+    setContent(current => ({ ...current, venue: '', venueDetail: '', mapUrl: '', travel: initialContent.travel }));
     const parsed = normalizeIvorianPhone(lookupPhone);
     if (!parsed.ok) { setLookupStatus(parsed.error); return; }
     setLookupBusy(true);
@@ -260,7 +263,8 @@ export default function Home() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Réponse introuvable.');
       const found: RsvpLookup = {
-        guestName: String(result.guestName), attending: Boolean(result.attending),
+        guestName: String(result.guestName), phoneNormalized: parsed.normalized,
+        attending: Boolean(result.attending),
         companions: Array.isArray(result.companions) ? result.companions.map(String) : [],
         companionCount: Number(result.companionCount) || 0, personCount: Number(result.personCount) || 0,
         maxCompanions: Number(result.maxCompanions) || 0,
@@ -278,7 +282,7 @@ export default function Home() {
   function startEdit() {
     if (!lookupResult) return;
     setRsvpStatus(''); setEditMode(true);
-    setGuestName(lookupResult.guestName); setPhone(lookupPhone);
+    setGuestName(lookupResult.guestName); setPhone(lookupResult.phoneNormalized);
     setAttending(lookupResult.attending ? 'yes' : 'no');
     setCompanions(lookupResult.attending ? [...lookupResult.companions] : []);
     setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(lookupResult.maxCompanions, Math.min(lookupResult.companions.length, MAX_COMPANIONS))));
