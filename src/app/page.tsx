@@ -220,6 +220,7 @@ export default function Home() {
   const stamp = content.updatedAt
     ? new Date(content.updatedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
     : '';
+  const publicFaq = content.faq.filter(item => item.confirmed && item.detail.trim());
   const venueMapUrl = (() => {
     try {
       const parsed = new URL(content.mapUrl);
@@ -674,7 +675,6 @@ export default function Home() {
           </div>
         </section>
 
-        {content.faq.some(item => item.confirmed && item.detail.trim()) && (
         <section className="section" id="faq">
           <div className="shell">
             <div className="section-head" data-reveal>
@@ -683,16 +683,26 @@ export default function Home() {
               <p>Les informations utiles pour votre journée.</p>
             </div>
             <div className="faq">
-              {content.faq.filter(item => item.confirmed && item.detail.trim()).map(item => (
+              {publicFaq.length > 0 ? publicFaq.map(item => (
                 <details key={item.id} data-reveal>
                   <summary>{item.title}</summary>
                   <p>{item.detail}</p>
                 </details>
-              ))}
+              )) : (
+                <>
+                  <details data-reveal>
+                    <summary>J’ai déjà répondu. Comment retrouver les informations ?</summary>
+                    <p>Entrez le numéro de téléphone utilisé lors de votre inscription dans la rubrique « Déjà enregistré ? ».</p>
+                  </details>
+                  <details data-reveal>
+                    <summary>Où trouver le lieu de la célébration ?</summary>
+                    <p>Le lieu et l’itinéraire sont réservés aux invités dont la présence est confirmée. Retrouvez votre réponse avec votre numéro de téléphone.</p>
+                  </details>
+                </>
+              )}
             </div>
           </div>
         </section>
-        )}
 
         <section className="refontiq-band" aria-label="À propos de ce site">
           <div className="shell refontiq-note">
