@@ -33,7 +33,7 @@ type RsvpReceipt = {
   personCount: number;
   updated: boolean;
   possibleDuplicate: boolean;
-  status: 'accepted' | 'waitlisted' | 'declined';
+  status: 'accepted' | 'waitlisted' | 'declined' | 'review';
 };
 
 function Calendar() {
@@ -390,7 +390,7 @@ export default function Home() {
         personCount: typeof result.personCount === 'number' ? result.personCount : 1,
         updated: Boolean(result.updated),
         possibleDuplicate: Boolean(result.possibleDuplicate),
-        status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
+        status: result.status === 'review' ? 'review' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
       });
 
       const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
@@ -728,9 +728,15 @@ export default function Home() {
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
               {rsvpReceipt.attending && rsvpReceipt.status !== 'waitlisted' ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.status === 'waitlisted' ? 'Votre réponse a bien été reçue' : rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.status === 'review' ? 'Votre demande doit être vérifiée' : rsvpReceipt.status === 'waitlisted' ? 'Votre réponse a bien été reçue' : rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
-            {rsvpReceipt.status === 'waitlisted' ? (
+            {rsvpReceipt.status === 'review' ? (
+              <>
+                <p id="rsvp-modal-text">Votre demande a bien été reçue, mais un nom très proche figure déjà dans la liste des invités. Les organisateurs vont vérifier qu’il ne s’agit pas d’un doublon et vous contacteront sur WhatsApp au numéro indiqué.</p>
+                <p className="modal-note">Votre invitation n’est pas encore confirmée. Aucune place n’est réservée tant que la vérification n’est pas terminée.</p>
+                <div className="modal-actions"><button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button></div>
+              </>
+            ) : rsvpReceipt.status === 'waitlisted' ? (
               <>
                 <p id="rsvp-modal-text">Merci pour votre réponse. Les familles vous communiqueront les informations pratiques dès que possible.</p>
                 <p className="modal-note">Nous avons bien enregistré votre demande.</p>
