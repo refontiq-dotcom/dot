@@ -12,12 +12,10 @@ create table if not exists public.private_event_details (
 );
 
 with source as (
-  select value
-  from public.site_content
-  where key = 'content'
-  union all
-  select '{}'::jsonb
-  limit 1
+  select coalesce(
+    (select value from public.site_content where key = 'content' limit 1),
+    '{}'::jsonb
+  ) as value
 )
 insert into public.private_event_details (id, venue, venue_detail, map_url, travel)
 select
@@ -25,7 +23,7 @@ select
   coalesce(nullif(value->>'venue', ''), 'Cocody Angré Mahou'),
   coalesce(nullif(value->>'venueDetail', ''), 'Près de Laser Park'),
   coalesce(nullif(value->>'mapUrl', ''), 'https://maps.app.goo.gl/EnyMdjAcEYsvyqW48'),
-  coalesce(value->'travel', jsonb_build_object(
+  coalesce(nullif(value->'travel', 'null'::jsonb), jsonb_build_object(
     'stopName', 'Commissariat du 22e arrondissement',
     'walkNote', 'Depuis l’arrêt, marchez jusqu’à Laser Park, puis jusqu’au lieu de réception.',
     'taxiFrom', 'Carrefour La Vie',
