@@ -126,8 +126,9 @@ describe('Accompagnateurs (scénarios D, E, F, G)', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('refuse un nom vide, trop long ou une liste trop grande', () => {
+  it('refuse un nom vide, numérique, trop long ou une liste trop grande', () => {
     expect(cleanCompanionNames([''], true).ok).toBe(false);
+    expect(cleanCompanionNames(['0710500584'], true).ok).toBe(false);
     expect(cleanCompanionNames(['A'.repeat(121)], true).ok).toBe(false);
     expect(cleanCompanionNames(Array.from({ length: MAX_COMPANIONS + 1 }, (_, i) => `Invité ${i}`), true).ok).toBe(false);
   });
