@@ -395,7 +395,18 @@ export default function Home() {
         status: result.status === 'review' ? 'review' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
       });
 
-      const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
+      if (editMode) {
+        setLookupResult(current => current ? {
+          ...current,
+          guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
+          attending: attendingYes,
+          companions: attendingYes ? companionNames : [],
+          companionCount: attendingYes ? companionNames.length : 0,
+          personCount: typeof result.personCount === 'number' ? result.personCount : (attendingYes ? 1 + companionNames.length : 0),
+          status: result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : result.status === 'review' ? 'review' : 'accepted',
+          ...(result.venueDetails ? { venueDetails: result.venueDetails } : {}),
+        } : current);
+      }
       resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -415,7 +426,7 @@ export default function Home() {
             <a href="#rsvp">Présence</a>
             <a href="#faq">Questions</a>
           </nav>
-          <a className="button small" href="#annonces">Dernières nouvelles <Megaphone size={16} /></a>
+
         </div>
       </header>
 
@@ -480,12 +491,6 @@ export default function Home() {
               <h2>Programme de la journée</h2>
               <p style={{ color: 'var(--muted)' }}>Voici le déroulé complet de la journée. Les horaires peuvent légèrement évoluer : revenez consulter cette page.</p>
               <ProgramTimeline items={content.items.filter(item => !item.familyOnly && item.confirmed).map(item => ({ ...item, detail: '' }))} />
-            </div>
-            <div className="card program-aside" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
-              <div className="iconbox"><Clock3 /></div>
-              <h3>Un programme qui évolue</h3>
-              <p>Revenez consulter cette page avant la cérémonie : les dernières précisions seront publiées ici par les familles.</p>
-              {stamp && <p className="latest">Dernière mise à jour : {stamp}</p>}
             </div>
           </div>
         </section>
@@ -642,6 +647,7 @@ export default function Home() {
           </div>
         </section>
 
+        {content.faq.some(item => item.confirmed && item.detail.trim()) && (
         <section className="section" id="faq">
           <div className="shell">
             <div className="section-head" data-reveal>
@@ -659,6 +665,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+        )}
 
         <section className="refontiq-band" aria-label="À propos de ce site">
           <div className="shell refontiq-note">
@@ -740,13 +747,13 @@ export default function Home() {
                       {content.pagne.contacts.map((contact, index) => {
                         const digits = contact.phone.replace(/\D/g, '');
                         const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
-                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
+                        const whatsappUrl = pagneWhatsAppUrl('+225 0501190633', rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
                         return digits.length >= 8 ? (
                           <div className="modal-pagne-contact" key={contact.id}>
                             <span>Contact : <strong>{sellerName}</strong></span>
                             <div className="modal-pagne-actions">
                               <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Commander sur WhatsApp</a>
-                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} /> Appeler</a>
+                              <a className="button secondary" href="tel:+2250501190633"><Phone size={16} /> Appeler</a>
                             </div>
                           </div>
                         ) : null;
