@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
   const { data: row, error } = await supabase
     .from('rsvp_responses')
-    .select('id, guest_name, confirmed, max_companions')
+    .select('id, guest_name, confirmed, max_companions, attendance_status')
     .eq('phone_normalized', phone.normalized)
     .maybeSingle();
   if (error) {
@@ -80,11 +80,24 @@ export async function POST(request: NextRequest) {
     return jsonError('Votre réponse n’a pas pu être retrouvée. Veuillez réessayer.', 500);
   }
 
+  let venueDetails: Record<string, unknown> | null = null;
+  if (row.attendance_status === 'accepted') {
+    const { data: details, error: detailsError } = await supabase
+      .from('private_event_details')
+      .select('venue, venue_detail, map_url, travel')
+      .eq('id', 'main')
+      .maybeSingle();
+    if (detailsError) console.error('Dot private venue lookup failed:', detailsError.message);
+    else if (details) venueDetails = details as Record<string, unknown>;
+  }
+
   return json({
     ok: true,
     guestName: row.guest_name,
     attending: row.confirmed === true,
     companions: (companionRows ?? []).map(c => String(c.full_name)),
     maxCompanions: Number(row.max_companions ?? 0),
+    status: row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined'),
+    ...(venueDetails ? { venueDetails } : {}),
   });
 }
