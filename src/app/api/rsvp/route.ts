@@ -13,8 +13,7 @@ import {
   clientIp,
   getAdminClient,
   hashIp,
-  isRateLimited,
-  recordRateEvent,
+  consumeRateLimit,
   requestOriginAllowed,
 } from '@/lib/rsvp-server';
 
@@ -84,11 +83,9 @@ export async function POST(request: NextRequest) {
 
   const ipHash = hashIp(clientIp(request.headers));
   try {
-    if (await isRateLimited(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.savePerHourPerIp })) {
+    if (await consumeRateLimit(supabase, { ipHash, windowMinutes: 60, limit: RATE_LIMITS.savePerHourPerIp })) {
       return jsonError('Trop de tentatives depuis cette connexion. Patientez quelques minutes.', 429, 'rate_limited');
     }
-    // Enregistre aussi les tentatives qui échouent ensuite dans la validation métier.
-    await recordRateEvent(supabase, ipHash);
   } catch {
     return jsonError('Le service est momentanément indisponible. Veuillez réessayer plus tard.', 503, 'rate_limit_unavailable');
   }
