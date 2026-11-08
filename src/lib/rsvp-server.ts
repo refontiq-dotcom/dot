@@ -34,11 +34,11 @@ export function hashIp(ip: string): string {
   return createHash('sha256').update(ip).digest('hex');
 }
 
-/** Adresse IP derrière le proxy Vercel, sans la stocker en clair. */
+/** Adresse IP transmise par le proxy ; seul son hash est conservé en base. */
 export function clientIp(headers: Headers): string {
-  const forwarded = headers.get('x-forwarded-for');
-  const first = forwarded?.split(',')[0]?.trim();
-  return first || headers.get('x-real-ip')?.trim() || 'unknown';
+  return headers.get('x-real-ip')?.trim()
+    || headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || 'unknown';
 }
 
 type RateLimitInput = {
@@ -57,15 +57,17 @@ export async function isRateLimited(supabase: SupabaseClient, input: RateLimitIn
     .gte('created_at', since);
 
   if (error) {
-    // Ne jamais bloquer un invité à cause d'un incident de mesure.
     console.error('Dot RSVP rate limit read failed:', error.message);
-    return false;
+    throw new Error('RSVP_RATE_LIMIT_UNAVAILABLE');
   }
   return (count ?? 0) >= input.limit;
 }
 
 export async function recordRateEvent(supabase: SupabaseClient, ipHash: string): Promise<void> {
   const { error } = await supabase.from('rsvp_rate_events').insert({ ip_hash: ipHash });
-  if (error) console.error('Dot RSVP rate event insert failed:', error.message);
+  if (error) {
+    console.error('Dot RSVP rate event insert failed:', error.message);
+    throw new Error('RSVP_RATE_LIMIT_UNAVAILABLE');
+  }
 }
 
