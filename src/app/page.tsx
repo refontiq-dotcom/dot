@@ -415,9 +415,7 @@ export default function Home() {
         <div className="shell nav">
           <a href="#accueil" className="brand">F <span style={{ color: 'var(--accent)' }}>×</span> V</a>
           <nav className="navlinks" aria-label="Navigation principale">
-            {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
             <a href="#programme">Programme</a>
-            <a href="#lieu">Le lieu</a>
             <a href="#rsvp">Présence</a>
             <a href="#faq">Questions</a>
           </nav>
@@ -454,9 +452,7 @@ export default function Home() {
               </div>
               {countdown.state === 'past' && <p className="latest">La cérémonie a eu lieu le {formattedEventDate}.</p>}
               <div className="actions">
-                {content.pagne.enabled && <a className="button accent" href="#pagne"><ShoppingBag size={18} /> Acheter le pagne de la dot</a>}
                 <a className="button" href="#rsvp"><CalendarCheck size={18} /> Confirmer ma présence</a>
-                <a className="button secondary" href="#lieu"><MapPin size={18} /> Voir le lieu</a>
               </div>
               <div className="hero-links">
                 <a className="hero-link" href="#programme"><ListChecks size={17} /> Voir le programme de la journée</a>
@@ -466,56 +462,20 @@ export default function Home() {
           </div>
         </section>
 
-        {content.pagne.enabled && (
-          <section className="section" id="pagne">
-            <div className="shell pagne-section">
-              <div className="section-head" data-reveal>
-                <div className="eyebrow">Commande directe auprès des vendeurs</div>
-                <h2>Le pagne de la dot</h2>
-                <p>{content.pagne.description}</p>
-              </div>
-              <div className="pagne-card" data-reveal>
-                <div className="pagne-visual">
-                  {content.pagne.imageUrl
-                    ? <img src={content.pagne.imageUrl} alt="Pagne proposé pour la dot" />
-                    : <div className="pagne-placeholder"><ShoppingBag size={42}/><span>Photo du pagne à venir</span></div>}
-                </div>
-                <div className="pagne-details">
-                  <div className="eyebrow">Prix du morceau de pagne</div>
-                  <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA</div>
-                  <p>Choisissez un vendeur et contactez-le directement pour passer votre commande.</p>
-                  {content.pagne.contacts.length > 0 ? content.pagne.contacts.map((contact, index) => {
-                    const digits = contact.phone.replace(/\D/g, '');
-                    const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
-                    return <div className="pagne-seller" key={contact.id}>
-                      <strong>{contact.label.trim() || `Vendeur ${index + 1}`}</strong>
-                      <span>{contact.phone}</span>
-                      {digits.length >= 8 && <div className="pagne-actions">
-                        <a className="button" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={17}/> Appeler pour commander</a>
-                        <a className="button secondary" href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Commander sur WhatsApp</a>
-                      </div>}
-                    </div>;
-                  }) : <p className="notice">Les contacts des vendeurs seront bientôt affichés ici.</p>}
+        {content.announcement.trim() && !content.announcement.trim().toLowerCase().startsWith('bienvenue sur votre espace famille') && (
+          <section className="section soft" id="annonces">
+            <div className="shell">
+              <div className="section-head" data-reveal><div className="eyebrow">À lire en premier</div><h2>Information des familles</h2></div>
+              <div className="announcement" data-reveal>
+                <Megaphone size={24} style={{ flexShrink: 0, marginTop: 3 }} />
+                <div>
+                  <p>{content.announcement}</p>
+                  {stamp && <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>}
                 </div>
               </div>
             </div>
           </section>
         )}
-
-        <section className="section soft" id="annonces">
-          <div className="shell">
-            <div className="section-head" data-reveal><div className="eyebrow">À lire en premier</div><h2>La dernière nouvelle</h2></div>
-            <div className="announcement" data-reveal>
-              <Megaphone size={24} style={{ flexShrink: 0, marginTop: 3 }} />
-              <div>
-                <h3>Information des familles</h3>
-                <p>{content.announcement}</p>
-                {stamp && <div className="latest" style={{ color: '#cfe0ec' }}>Mis à jour : {stamp}</div>}
-              </div>
-            </div>
-            <p className="latest"><Info size={14} style={{ verticalAlign: '-2px' }} /> Les détails encore en préparation sont indiqués « à confirmer ».</p>
-          </div>
-        </section>
 
         <section className="section" id="programme">
           <div className="shell location">
@@ -523,7 +483,7 @@ export default function Home() {
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
               <p style={{ color: 'var(--muted)' }}>Voici le déroulé complet de la journée. Les horaires peuvent légèrement évoluer : revenez consulter cette page.</p>
-              <ProgramTimeline items={content.items.filter(item => !item.familyOnly)} />
+              <ProgramTimeline items={content.items.filter(item => !item.familyOnly && item.confirmed).map(item => ({ ...item, detail: '' }))} />
             </div>
             <div className="card program-aside" style={{ background: 'var(--sand)', border: 0 }} data-reveal>
               <div className="iconbox"><Clock3 /></div>
@@ -534,37 +494,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="section soft" id="lieu">
-          <div className="shell location">
-            <div data-reveal>
-              <div className="eyebrow">Retrouvons-nous</div>
-              <h2>Comment venir ?</h2>
-              {showTravelGuide && content.venue ? (
-                <>
-                  <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
-                  <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-                  <div style={{ marginTop: 16 }}>
-                    <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
-                  </div>
-                  <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
-                </>
-              ) : (
-                <div className="card" style={{ marginTop: 24 }}>
-                  <div className="eyebrow">Informations pratiques</div>
-                  <h3>Le lieu sera communiqué après confirmation de votre présence.</h3>
-                  <p>Si vous avez déjà répondu, retrouvez votre réponse avec votre nom et votre numéro pour consulter les indications.</p>
-                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ou retrouver ma réponse</a>
-                </div>
-              )}
-            </div>
-            {showTravelGuide && content.venue ? (
-              <div className="mapbox" data-reveal>
-                <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
-              </div>
-            ) : <div className="mapbox" data-reveal><div><Lock size={30}/><p style={{margin:'8px 0 2px',fontWeight:700}}>Accès réservé</p><small>Les indications seront affichées après confirmation.</small></div></div>}
-          </div>
-        </section>
-
         <section className="section soft" id="rsvp">
           <div className="shell">
             <div className="section-head" data-reveal>
@@ -572,6 +501,48 @@ export default function Home() {
               <h2>Confirmer votre présence</h2>
               <p>Merci de répondre pour que les familles puissent préparer votre accueil.</p>
             </div>
+            <section className="rsvp-lookup-card" aria-labelledby="rsvp-lookup-title" data-reveal>
+              <div className="eyebrow">Vous avez déjà répondu ?</div>
+              <h3 id="rsvp-lookup-title">Déjà enregistré ?</h3>
+              <p>Entrez le numéro utilisé lors de votre inscription pour retrouver votre réponse et les informations réservées aux invités confirmés.</p>
+              <form className="rsvp-lookup-form" onSubmit={findRsvp}>
+                <label htmlFor="lookup-phone">Votre numéro de téléphone</label>
+                <input id="lookup-phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} required value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} placeholder="Ex. : 07 00 00 00 00" />
+                <button className="button" type="submit" disabled={lookupBusy}>{lookupBusy ? 'Recherche…' : 'Retrouver ma réponse'}</button>
+              </form>
+              {lookupStatus && <p className="rsvp-status" role="alert">{lookupStatus}</p>}
+              {lookupResult && (
+                <div className="rsvp-lookup-result" aria-live="polite">
+                  <div className="rsvp-lookup-result-head">
+                    <div><span className="eyebrow">Votre réponse</span><h3>{lookupResult.guestName}</h3></div>
+                    <span className={'rsvp-lookup-status ' + lookupResult.status}>{lookupResult.status === 'accepted' ? 'Présence confirmée' : lookupResult.status === 'waitlisted' ? 'En liste d’attente' : lookupResult.status === 'review' ? 'À vérifier' : 'Absence enregistrée'}</span>
+                  </div>
+                  <p>{lookupResult.status === 'accepted' ? 'Votre groupe compte ' + lookupResult.personCount + ' personne' + (lookupResult.personCount > 1 ? 's' : '') + '.' : lookupResult.status === 'waitlisted' ? 'Votre demande est enregistrée. Les familles vous informeront si une place se libère.' : lookupResult.status === 'review' ? 'Votre demande doit encore être vérifiée par les familles.' : 'Votre absence a bien été enregistrée.'}</p>
+                  {lookupResult.attending && lookupResult.companions.length > 0 && <p className="rsvp-lookup-names"><strong>Personnes déclarées :</strong> {lookupResult.guestName}, {lookupResult.companions.join(', ')}</p>}
+                  {lookupResult.status === 'accepted' && lookupResult.venueDetails && (
+                    <div className="rsvp-private-details">
+                      <div className="eyebrow">Informations réservées aux invités confirmés</div>
+                      <h4><MapPin size={18} /> {content.venue || 'Votre lieu de réception'}</h4>
+                      {content.venueDetail && <p>{content.venueDetail}</p>}
+                      {venueMapUrl && <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir mon itinéraire</a>}
+                      <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+                    </div>
+                  )}
+                  {lookupResult.status === 'accepted' && content.pagne.enabled && (
+                    <div className="rsvp-private-pagne">
+                      <div className="eyebrow"><ShoppingBag size={16} /> Pagne officiel</div>
+                      <p>Vous souhaitez commander le pagne de la dot ? Contactez directement la vendeuse.</p>
+                      <strong>{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA le morceau</strong>
+                      <div className="pagne-actions">
+                        <a className="button" href={pagneWhatsAppUrl('+225 0501190633', lookupResult.guestName, lookupResult.personCount, content.pagne.contacts[0]?.label || 'Madame Traoré', Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName)} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Commander sur WhatsApp</a>
+                        <a className="button secondary" href="tel:+2250501190633"><Phone size={17} /> Appeler</a>
+                      </div>
+                    </div>
+                  )}
+                  <div className="rsvp-lookup-actions"><button type="button" className="button" onClick={startEdit}><Pencil size={17} /> Modifier ma présence</button></div>
+                </div>
+              )}
+            </section>
             <form className="rsvp-form" onSubmit={submitRsvp} data-reveal>
               {editMode && (
                 <div className="rsvp-edit-banner" role="status">
@@ -686,12 +657,12 @@ export default function Home() {
             <div className="section-head" data-reveal>
               <div className="eyebrow">Besoin d’un renseignement ?</div>
               <h2>Questions fréquentes</h2>
-              <p>Les réponses sont ajoutées au fil des confirmations des familles.</p>
+              <p>Les informations utiles pour votre journée.</p>
             </div>
             <div className="faq">
-              {content.faq.map(item => (
+              {content.faq.filter(item => item.confirmed && item.detail.trim()).map(item => (
                 <details key={item.id} data-reveal>
-                  <summary>{item.title}{!item.confirmed && <span className="tag" style={{ marginLeft: 8 }}>À confirmer</span>}</summary>
+                  <summary>{item.title}</summary>
                   <p>{item.detail}</p>
                 </details>
               ))}
@@ -719,7 +690,6 @@ export default function Home() {
       <nav className="mobile-nav" aria-label="Navigation rapide">
         <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
         <a href="#programme" aria-current={activeSection === 'programme' ? 'location' : undefined}><ListChecks /><span>Programme</span></a>
-        <a href="#lieu" aria-current={activeSection === 'lieu' ? 'location' : undefined}><MapPin /><span>Lieu</span></a>
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
       </nav>
