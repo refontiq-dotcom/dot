@@ -59,6 +59,9 @@ export function validateGuestName(value: unknown): string | null {
   if (name.length < 2 || name.length > 120) {
     return 'Veuillez saisir votre nom et prénom (2 à 120 caractères).';
   }
+  if (!/\\p{L}/u.test(name)) {
+    return 'Le nom doit contenir au moins une lettre.';
+  }
   return null;
 }
 
@@ -79,6 +82,34 @@ export function normalizeNameKey(value: unknown): string {
     .filter(Boolean)
     .sort()
     .join(' ');
+}
+
+
+/**
+ * Compare deux noms pour repérer une probable même personne malgré les accents,
+ * les particules de nom (Epse/Épouse) et les prénoms ou noms supplémentaires.
+ * Il faut au moins deux mots distinctifs communs et 75 % des mots du nom le plus
+ * court. Cette règle sert à bloquer une inscription suspecte, pas à fusionner
+ * des dossiers : l'invité est invité à contacter les familles.
+ */
+export function normalizedNameTokens(value: unknown): string[] {
+  const ignored = new Set(['epse', 'epouse', 'mme', 'mr', 'madame', 'monsieur', 'de', 'du', 'des', 'le', 'la', 'les']);
+  const normalized = cleanPersonName(value)
+    .normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\\p{L}\\p{N}]+/gu, ' ');
+  return [...new Set(normalized.split(' ').filter(token => token.length > 1 && !ignored.has(token)))];
+}
+
+export function namesMayReferToSamePerson(left: unknown, right: unknown): boolean {
+  const leftTokens = normalizedNameTokens(left);
+  const rightTokens = normalizedNameTokens(right);
+  const shortestLength = Math.min(leftTokens.length, rightTokens.length);
+  if (shortestLength < 2) return false;
+  const rightSet = new Set(rightTokens);
+  const shared = leftTokens.filter(token => rightSet.has(token)).length;
+  return shared >= 2 && shared * 4 >= shortestLength * 3;
 }
 
 export type CompanionValidation =
