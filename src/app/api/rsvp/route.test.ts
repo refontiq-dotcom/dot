@@ -89,8 +89,8 @@ describe('POST /api/rsvp — inscription simple, sans compte', () => {
     expect((await response.json()).code).toBe('invalid_companions');
   });
 
-  it('refuse plus de 9 accompagnateurs', async () => {
-    const companions = Array.from({ length: 10 }, (_, index) => `Invité ${index + 1}`);
+  it('refuse plus de 2 proches', async () => {
+    const companions = Array.from({ length: 3 }, (_, index) => `Invité ${index + 1}`);
     const response = await POST(request(payload({ companions })));
     expect(response.status).toBe(400);
     expect((await response.json()).code).toBe('invalid_companions');

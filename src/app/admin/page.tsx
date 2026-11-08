@@ -4,16 +4,16 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
-import { declaredGroupSize, normalizeNameKey, summarizeGuests } from '@/lib/rsvp';
+import { declaredGroupSize, namesMayReferToSamePerson, summarizeGuests } from '@/lib/rsvp';
 import { formatRange, sortByTime } from '@/lib/program';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
 const plain = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const phoneDigits = (phone: string) => { const d = phone.replace(/\D/g, ''); return d.length === 10 ? `225${d}` : d; };
 type Companion = { id: string; full_name: string; position: number };
-type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
-type GuestFilter = 'all' | 'yes' | 'no' | 'check';
-type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
+type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; attendance_status?: 'accepted' | 'waitlisted' | 'declined' | 'review'; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
+type GuestFilter = 'all' | 'yes' | 'no' | 'waitlisted' | 'check';
+type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; status: 'accepted' | 'waitlisted' | 'declined' | 'review'; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
 type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
 
 export default function AdminPage() {
@@ -31,8 +31,19 @@ export default function AdminPage() {
   },[]);
   const refresh=useCallback(async()=>{
     setLoading(true);setNotice('');
-    try { const sb=getSupabase(); const [c,r]=await Promise.all([loadContent(),sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false})]);
-      if(r.error)throw r.error;setContent(c);setGuests((r.data??[]) as RSVP[]);
+    try { const sb=getSupabase(); const {data:auth}=await sb.auth.getSession(); const token=auth.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const [c,r,privateResponse]=await Promise.all([
+        loadContent(),
+        sb.from('rsvp_responses').select('id,guest_name,phone,person_count,confirmed,attendance_status,created_at,updated_at,rsvp_companions(id,full_name,position)').order('created_at',{ascending:false}),
+        fetch('/api/admin/event-details',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'}),
+      ]);
+      if(r.error)throw r.error;
+      const privateResult=await privateResponse.json();
+      if(!privateResponse.ok)throw new Error(privateResult.error||'Impossible de charger le lieu privé.');
+      const d=privateResult.details??{};
+      setContent({...c,venue:String(d.venue??''),venueDetail:String(d.venue_detail??''),mapUrl:String(d.map_url??''),travel:{...c.travel,...(d.travel??{})}});
+      setGuests((r.data??[]) as RSVP[]);
     } catch(e){setNotice(e instanceof Error?e.message:'Chargement impossible.');} finally{setLoading(false);}
   },[]);
   useEffect(()=>{void checkSession();let sub:{unsubscribe:()=>void}|undefined;
@@ -48,6 +59,19 @@ export default function AdminPage() {
     finally{setBusy(false);}
   }
   async function logout(){await getSupabase().auth.signOut();setLogged(false);setGuests([]);}
+  async function resolveReview(id:string,decision:'accepted'|'declined'){
+    setNotice('');
+    try{
+      const {data}=await getSupabase().auth.getSession();
+      const token=data.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const response=await fetch('/api/admin/rsvp-review',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({id,decision})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Impossible de traiter cette demande.');
+      await refresh();
+      setNotice(result.status==='waitlisted'?'Demande validée, mais le groupe est placé en attente faute de places disponibles.':decision==='accepted'?'Demande vérifiée : invitation confirmée.':'Demande vérifiée : invitation refusée.');
+    }catch(e){setNotice(e instanceof Error?e.message:'Impossible de traiter cette demande.');}
+  }
   function field<K extends keyof Content>(key:K,value:Content[K]){setContent(v=>({...v,[key]:value}));}
   function setTravel(patch:Partial<Content['travel']>){setContent(v=>({...v,travel:{...v.travel,...patch}}));}
   function editBusLine(i:number,patch:Partial<Content['travel']['busLines'][number]>){setContent(v=>({...v,travel:{...v.travel,busLines:v.travel.busLines.map((l,n)=>n===i?{...l,...patch}:l)}}));}
@@ -58,7 +82,14 @@ export default function AdminPage() {
   function moveItem(i:number,dir:-1|1){setContent(v=>{const j=i+dir;if(j<0||j>=v.items.length)return v;const items=[...v.items];[items[i],items[j]]=[items[j],items[i]];return {...v,items};});}
   function sortItemsByTime(){setContent(v=>({...v,items:sortByTime(v.items)}));}
   function removeItem(list:'items'|'faq',i:number){setContent(v=>({...v,[list]:v[list].filter((_,n)=>n!==i)}));}
-  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.travel.stopName.trim())throw new Error('Indiquez le nom de l’arrêt où les bus descendent.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};await saveContent(next);setContent(next);setNotice('Modifications enregistrées. Le site public affichera les nouvelles informations.');}catch(e){const raw=e instanceof Error?e.message:'';setNotice(/column .*(time|phase|highlight).* does not exist/i.test(raw)?'Le programme nécessite une mise à jour de la base : exécutez les migrations 20261106000002 et 20261106000003 dans Supabase, puis réessayez.':raw||'Enregistrement impossible.');}finally{setSaving(false);}}
+  async function save(){setSaving(true);setNotice('');try{if(!content.heroTitle.trim())throw new Error('Le titre principal ne peut pas être vide.');if(!content.travel.stopName.trim())throw new Error('Indiquez le nom de l’arrêt où les bus descendent.');if(!content.eventDate||!content.eventTime||!content.venue.trim())throw new Error('La date, l’heure et le lieu sont obligatoires.');const map=new URL(content.mapUrl);if(!['http:','https:'].includes(map.protocol))throw new Error('Le lien d’itinéraire doit commencer par https:// ou http://.');const next={...content,heroTitle:content.heroTitle.trim()};
+      await saveContent(next);
+      const sb=getSupabase();const {data:auth}=await sb.auth.getSession();const token=auth.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const privateResponse=await fetch('/api/admin/event-details',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({venue:next.venue,venueDetail:next.venueDetail,mapUrl:next.mapUrl,travel:next.travel})});
+      const privateResult=await privateResponse.json();
+      if(!privateResponse.ok)throw new Error(privateResult.error||'Impossible d’enregistrer le lieu privé.');
+      setContent(next);setNotice('Modifications enregistrées. Le lieu reste privé et ne sera communiqué qu’aux invités acceptés.');}catch(e){const raw=e instanceof Error?e.message:'';setNotice(/column .*(time|phase|highlight).* does not exist/i.test(raw)?'Le programme nécessite une mise à jour de la base : exécutez les migrations 20261106000002 et 20261106000003 dans Supabase, puis réessayez.':raw||'Enregistrement impossible.');}finally{setSaving(false);}}
   async function uploadPagneImage(event:ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     event.target.value='';
@@ -83,33 +114,38 @@ export default function AdminPage() {
     field('pagne',{...content.pagne,contacts:content.pagne.contacts.map((item,i)=>i===index?{...item,...patch}:item)});
   }
   function removePagneContact(index:number){field('pagne',{...content.pagne,contacts:content.pagne.contacts.filter((_,i)=>i!==index)});}
-  const summary=useMemo(()=>summarizeGuests(guests),[guests]);
+  const acceptedGuests=guests.filter(g=>g.attendance_status ? g.attendance_status==='accepted' : g.confirmed);
+  const waitlistedGuests=guests.filter(g=>g.attendance_status==='waitlisted');
+  const summary=useMemo(()=>summarizeGuests(acceptedGuests),[acceptedGuests]);
   const closeOnes=Math.max(summary.expectedPeople-summary.attending,0);
+  const acceptedPeople=summary.expectedPeople;
   const groups=useMemo<GuestGroup[]>(()=>{
     const list:GuestGroup[]=guests.map(g=>{
       const companions=[...(g.rsvp_companions??[])].sort((a,b)=>a.position-b.position).map(c=>c.full_name);
-      const size=declaredGroupSize(g.person_count,companions.length,g.confirmed);
-      return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:g.confirmed,size,companions,unnamed:g.confirmed?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
+      const status=g.attendance_status??(g.confirmed?'accepted':'declined');
+      const size=status==='declined'?0:Math.max(Number(g.person_count)||0,companions.length+1);
+      return {id:g.id,name:g.guest_name,phone:g.phone,confirmed:status==='accepted',status,size,companions,unnamed:status==='accepted'?Math.max(size-1-companions.length,0):0,createdAt:g.created_at,updatedAt:g.updated_at,duplicates:[]};
     });
-    // Un nom présent dans deux réponses différentes est signalé, jamais fusionné.
-    const owners=new Map<string,Set<string>>();
-    for(const g of list)for(const n of [g.name,...g.companions]){const k=normalizeNameKey(n);if(!k)continue;const ids=owners.get(k)??new Set<string>();ids.add(g.id);owners.set(k,ids);}
-    return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(n=>{const ids=owners.get(normalizeNameKey(n));return Boolean(ids&&ids.size>1);})}));
+    // Les ressemblances entre groupes sont signalées sans fusion ni modification automatique.
+    return list.map(g=>({...g,duplicates:[g.name,...g.companions].filter(name=>
+      list.some(other=>other.id!==g.id&&[other.name,...other.companions].some(candidate=>namesMayReferToSamePerson(name,candidate)))
+    )}));
   },[guests]);
   const searchTerm=plain(search.trim());
-  const counts={all:groups.length,yes:groups.filter(g=>g.confirmed).length,no:groups.filter(g=>!g.confirmed).length,check:groups.filter(g=>g.duplicates.length>0).length};
+  const counts={all:groups.length,yes:groups.filter(g=>g.status==='accepted').length,no:groups.filter(g=>g.status==='declined').length,waitlisted:groups.filter(g=>g.status==='waitlisted').length,check:groups.filter(g=>g.status==='review'||g.duplicates.length>0).length};
   const shown=useMemo(()=>groups.filter(g=>{
     if(searchTerm&&![g.name,...g.companions].some(n=>plain(n).includes(searchTerm)))return false;
     if(filter==='yes')return g.confirmed;
-    if(filter==='no')return !g.confirmed;
-    if(filter==='check')return g.duplicates.length>0;
+    if(filter==='no')return g.status==='declined';
+    if(filter==='waitlisted')return g.status==='waitlisted';
+    if(filter==='check')return g.status==='review'||g.duplicates.length>0;
     return true;
   }),[groups,searchTerm,filter]);
   function exportCsv(){
     const day=(v:string)=>new Date(v).toLocaleDateString('fr-FR');
     const rows=[['Nom','Invité ou proche','Venu(e) avec','Téléphone','Réponse','Personnes dans le groupe','Répondu le'],
       ...shown.flatMap(g=>{
-        const answer=g.confirmed?'Présent(e)':'Absent(e)',size=g.confirmed?String(g.size):'0';
+        const answer=g.status==='accepted'?'Présent(e)':g.status==='waitlisted'?'En attente':g.status==='review'?'À vérifier':'Absent(e)',size=g.status==='accepted'?String(g.size):'0';
         return [[g.name,'Invité','',g.phone??'',answer,size,day(g.createdAt)],
           ...g.companions.map(n=>[n,'Proche',g.name,'',answer,size,day(g.createdAt)]),
           ...(g.unnamed>0?[[`${g.unnamed} proche${g.unnamed>1?'s':''} (nom non donné)`,'Proche',g.name,'',answer,size,day(g.createdAt)]]:[])];
@@ -157,11 +193,12 @@ export default function AdminPage() {
       {notice&&<div className="admin-success" role="status">{notice}</div>}
       {tab==='overview'&&<>
         <div className="admin-hero-stat"><span>Personnes attendues le jour J</span><strong>{summary.expectedPeople}</strong>
-          <p>{summary.responses===0?'Aucune réponse pour le moment. Elles apparaîtront ici dès que vos invités confirmeront.':`${plural(summary.attending,'invité','invités')} + ${plural(closeOnes,'proche venu avec eux','proches venus avec eux')}`}</p></div>
+          <p>{summary.attending===0?'Aucune présence acceptée pour le moment.':`${plural(summary.attending,'invité','invités')} + ${plural(closeOnes,'proche venu avec eux','proches venus avec eux')}`}</p></div>
         <div className="admin-stat-grid three">
           <article className="admin-stat"><span>Invités présents</span><strong>{summary.attending}</strong><small><UserCheck size={14}/> ont dit oui</small></article>
           <article className="admin-stat"><span>Proches avec eux</span><strong>{closeOnes}</strong><small><Users size={14}/> famille, amis</small></article>
-          <article className="admin-stat"><span>Ne viennent pas</span><strong>{summary.declined}</strong><small><UserX size={14}/> ont dit non</small></article></div>
+          <article className="admin-stat"><span>En attente</span><strong>{waitlistedGuests.length}</strong><small>réponses reçues</small></article></div>
+        <div className="admin-panel"><h3>Capacité des invités</h3><p><b>{acceptedPeople} / 100</b> places confirmées · {Math.max(100-acceptedPeople,0)} restantes. Les 20 places des organisateurs sont réservées séparément.</p></div>
         <div className="admin-panel"><h3>Ce qu’il reste à faire</h3>
           <ul className="admin-todo">{todos.length===0?<li className="ok"><span>Tout est à jour. Rien à faire pour le moment.</span></li>:todos.map(t=><li key={t.text}><span>{t.text}</span><button className="button secondary small" onClick={()=>{if(t.filter)setFilter(t.filter);setTab(t.tab);}}>{t.action}</button></li>)}</ul></div>
         <div className="admin-panel"><h3>Accès rapide</h3><div className="admin-shortcuts"><button onClick={()=>{setFilter('all');setTab('guests');}}><Users/> Voir qui vient</button><button onClick={()=>setTab('announcement')}><Megaphone/> Écrire un message aux invités</button><button onClick={()=>setTab('program')}><ListChecks/> Modifier le programme</button><button onClick={()=>setTab('event')}><MapPin/> Modifier le titre, la date ou le lieu</button></div></div>
@@ -237,12 +274,13 @@ export default function AdminPage() {
 
       {tab==='guests'&&<div className="admin-panel"><div className="admin-inline-head"><div><h3>Qui vient ?</h3><p className="admin-muted">Chaque carte est un invité, avec les proches qui viennent avec lui.</p></div><button className="button secondary small" onClick={exportCsv}><Download size={16}/> Télécharger la liste (Excel)</button></div>
         <div className="admin-search"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Chercher un nom…" aria-label="Chercher un nom"/></div>
-        <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
+        <div className="admin-pills">{([['all','Tous',counts.all],['yes','Présents',counts.yes],['no','Absents',counts.no],['waitlisted','En attente',counts.waitlisted],...(counts.check>0?[['check','À vérifier',counts.check]]:[])] as [GuestFilter,string,number][]).map(([id,label,n])=><button key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label} ({n})</button>)}</div>
         <ul className="admin-guest-list">
           {shown.map(g=>{const digits=g.phone?phoneDigits(g.phone):'';return <li className="admin-guest-card" key={g.id}>
-            <div className="admin-guest-top"><b>{g.name}</b><span className={g.confirmed?'admin-status yes':'admin-status no'}>{g.confirmed?'Vient':'Ne vient pas'}</span></div>
-            {g.confirmed&&<p className="admin-guest-line"><Users size={16}/><span>{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
-            {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> WhatsApp</a></div>}
+            <div className="admin-guest-top"><b>{g.name}</b><span className={g.status==='accepted'?'admin-status yes':g.status==='waitlisted'?'admin-status':g.status==='review'?'admin-status review':'admin-status no'}>{g.status==='accepted'?'Vient':g.status==='waitlisted'?'En attente':g.status==='review'?'À vérifier':'Ne vient pas'}</span></div>
+            {(g.status==='accepted'||g.status==='waitlisted'||g.status==='review')&&<p className="admin-guest-line"><Users size={16}/><span>{g.status==='waitlisted'?'Groupe en attente · ':g.status==='review'?'Groupe non confirmé · ':''}{g.size>1?`${g.size} personnes au total`:'Vient seul(e)'}{g.companions.length>0&&<> · avec {g.companions.join(', ')}</>}{g.unnamed>0&&<> · {plural(g.unnamed,'proche dont le nom n’a pas été donné','proches dont le nom n’a pas été donné')}</>}</span></p>}
+            {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={g.status==='review'? `https://wa.me/${digits}?text=${encodeURIComponent(`Bonjour ${g.name}, nous vous contactons au sujet de la cérémonie de la Dot d’Anougbre Brou Frédéric et de Dukoua You Vanessa, prévue le 12 décembre 2026. Votre demande de présence a bien été reçue. Toutefois, votre nom semble déjà figurer dans notre liste d’invités. Afin de vérifier qu’il ne s’agit pas d’un doublon, pouvez-vous nous confirmer qu’il s’agit bien de votre première inscription ? Merci, les familles.`) }` : `https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> {g.status==='review'?'Contacter sur WhatsApp':'WhatsApp'}</a></div>}
+            {g.status==='review'&&<div className="admin-guest-actions"><button className="button small" onClick={()=>void resolveReview(g.id,'accepted')}>Confirmer l’invitation</button><button className="button secondary small" onClick={()=>void resolveReview(g.id,'declined')}>Refuser après vérification</button></div>}
             {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
             <p className="admin-guest-date">Répondu le {new Date(g.createdAt).toLocaleDateString('fr-FR')}{g.updatedAt&&g.updatedAt!==g.createdAt&&` · modifié le ${new Date(g.updatedAt).toLocaleDateString('fr-FR')}`}</p>
           </li>;})}

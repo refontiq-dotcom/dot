@@ -24,7 +24,7 @@ import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
 import ProgramTimeline from '@/components/ProgramTimeline';
 import InstallApp from '@/components/InstallApp';
-import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
+import { MAX_COMPANIONS, cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
   guestName: string;
@@ -33,10 +33,29 @@ type RsvpReceipt = {
   personCount: number;
   updated: boolean;
   possibleDuplicate: boolean;
+  status: 'accepted' | 'waitlisted' | 'declined' | 'review';
 };
 
 function Calendar() {
   return <CalendarDays size={19} />;
+}
+
+function pagneWhatsAppUrl(phone: string, guestName: string, personCount: number, sellerName: string, price: number, eventCouple: string) {
+  const digits = phone.replace(/\D/g, '');
+  const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
+  const groupLabel = personCount > 1 ? `${personCount} personnes` : '1 personne';
+  const message = [
+    `Bonjour ${sellerName},`,
+    '',
+    `Je suis ${guestName}. J'ai confirmé ma présence à la dot de ${eventCouple}.`,
+    `Nous serons ${groupLabel}.`,
+    '',
+    `Je souhaite commander le pagne officiel de la dot, au prix de ${price.toLocaleString('fr-FR')} FCFA le morceau.`,
+    'Pouvez-vous m’indiquer les modalités de commande et de retrait ?',
+    '',
+    'Merci.'
+  ].join('\n');
+  return `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(message)}`;
 }
 
 export default function Home() {
@@ -52,7 +71,7 @@ export default function Home() {
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editOriginalName, setEditOriginalName] = useState('');
-  const [maxCompanions, setMaxCompanions] = useState(9);
+  const [maxCompanions, setMaxCompanions] = useState(MAX_COMPANIONS);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [showTravelGuide, setShowTravelGuide] = useState(false);
   const [activeSection, setActiveSection] = useState('accueil');
@@ -60,11 +79,9 @@ export default function Home() {
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    try {
-      setShowTravelGuide(window.sessionStorage.getItem('dot-travel-guide-unlocked') === 'yes');
-    } catch {
-      setShowTravelGuide(false);
-    }
+    // Une ancienne valeur de session ne constitue jamais une preuve de confirmation.
+    try { window.sessionStorage.removeItem('dot-travel-guide-unlocked'); } catch {}
+    setShowTravelGuide(false);
   }, []);
   const eventDate = new Date(`${content.eventDate}T${content.eventTime}:00+00:00`);
   const formattedEventDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(eventDate);
@@ -214,7 +231,7 @@ export default function Home() {
     setRsvpStatus('');
     setEditMode(false);
     setEditOriginalName('');
-    setMaxCompanions(9);
+    setMaxCompanions(MAX_COMPANIONS);
   }
 
   // Retrouve la réponse de l'invité (nom + numéro) pour la modifier.
@@ -245,7 +262,20 @@ export default function Home() {
       setPhone(parsed.display);
       setAttending(result.attending ? 'yes' : 'no');
       setCompanions(result.attending ? found : []);
-      setMaxCompanions(Math.max(Number(result.maxCompanions) || 0, found.length));
+      setMaxCompanions(Math.min(MAX_COMPANIONS, Math.max(Number(result.maxCompanions) || 0, Math.min(found.length, MAX_COMPANIONS))));
+      if (result.status === 'accepted' && result.venueDetails) {
+        const details = result.venueDetails as Record<string, unknown>;
+        setContent(current => ({
+          ...current,
+          venue: String(details.venue ?? ''),
+          venueDetail: String(details.venue_detail ?? ''),
+          mapUrl: String(details.map_url ?? ''),
+          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
+        }));
+        setShowTravelGuide(true);
+      } else {
+        setShowTravelGuide(false);
+      }
       setPendingRemoval(null);
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -343,6 +373,16 @@ export default function Home() {
         throw new Error(result.error || 'Enregistrement impossible.');
       }
 
+      if (result.status === 'accepted' && result.venueDetails) {
+        const details = result.venueDetails as Record<string, unknown>;
+        setContent(current => ({
+          ...current,
+          venue: String(details.venue ?? ''),
+          venueDetail: String(details.venue_detail ?? ''),
+          mapUrl: String(details.map_url ?? ''),
+          travel: details.travel && typeof details.travel === 'object' ? details.travel as Content['travel'] : current.travel,
+        }));
+      }
       setRsvpReceipt({
         guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
         attending: typeof result.attending === 'boolean' ? result.attending : attendingYes,
@@ -350,19 +390,11 @@ export default function Home() {
         personCount: typeof result.personCount === 'number' ? result.personCount : 1,
         updated: Boolean(result.updated),
         possibleDuplicate: Boolean(result.possibleDuplicate),
+        status: result.status === 'review' ? 'review' : result.status === 'waitlisted' ? 'waitlisted' : result.status === 'declined' ? 'declined' : 'accepted',
       });
 
-      const travelGuideUnlocked = attendingYes;
+      const travelGuideUnlocked = attendingYes && result.status === 'accepted' && Boolean(result.venueDetails);
       setShowTravelGuide(travelGuideUnlocked);
-      try {
-        if (travelGuideUnlocked) {
-          window.sessionStorage.setItem('dot-travel-guide-unlocked', 'yes');
-        } else {
-          window.sessionStorage.removeItem('dot-travel-guide-unlocked');
-        }
-      } catch {
-        // Le guide reste accessible dans la session courante même si le stockage est indisponible.
-      }
       resetRsvpForm();
     } catch (error) {
       setRsvpStatus(error instanceof Error ? error.message : 'Une erreur est survenue. Réessayez.');
@@ -502,26 +534,29 @@ export default function Home() {
             <div data-reveal>
               <div className="eyebrow">Retrouvons-nous</div>
               <h2>Comment venir ?</h2>
-              <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
-              <p>Un repère facilement partageable : <strong>{content.venueDetail}</strong>, à {content.venue}. Les indications plus précises seront ajoutées dès confirmation par les familles.</p>
-              <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
-              <div style={{ marginTop: 16 }}>
-                <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
-              </div>
-              {showTravelGuide ? (
-                <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+              {showTravelGuide && content.venue ? (
+                <>
+                  <p style={{ color: 'var(--muted)' }}>{content.venue}, {content.venueDetail}.</p>
+                  <div className="notice"><Info size={17} style={{ verticalAlign: '-3px' }} /> {content.venue} — {content.venueDetail}.</div>
+                  <div style={{ marginTop: 16 }}>
+                    <a className="button secondary" href={venueMapUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Voir le lieu sur Google Maps</a>
+                  </div>
+                  <TravelGuide travel={content.travel} mapUrl={venueMapUrl} />
+                </>
               ) : (
                 <div className="card" style={{ marginTop: 24 }}>
-                  <div className="eyebrow">Accès aux indications détaillées</div>
-                  <h3>Vous venez célébrer avec nous ?</h3>
-                  <p>Confirmez votre présence dans le formulaire ci-dessous pour afficher les différents moyens de rejoindre le lieu de réception.</p>
-                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ma présence</a>
+                  <div className="eyebrow">Informations pratiques</div>
+                  <h3>Le lieu sera communiqué après confirmation de votre présence.</h3>
+                  <p>Si vous avez déjà répondu, retrouvez votre réponse avec votre nom et votre numéro pour consulter les indications.</p>
+                  <a className="button secondary" href="#rsvp" style={{ marginTop: 12 }}>Confirmer ou retrouver ma réponse</a>
                 </div>
               )}
             </div>
-            <div className="mapbox" data-reveal>
-              <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
-            </div>
+            {showTravelGuide && content.venue ? (
+              <div className="mapbox" data-reveal>
+                <div><MapPin size={30} /><p style={{ margin: '8px 0 2px', fontWeight: 700 }}>{content.venue}</p><small>{content.venueDetail}<br />Repère indicatif</small></div>
+              </div>
+            ) : <div className="mapbox" data-reveal><div><Lock size={30}/><p style={{margin:'8px 0 2px',fontWeight:700}}>Accès réservé</p><small>Les indications seront affichées après confirmation.</small></div></div>}
           </div>
         </section>
 
@@ -573,7 +608,7 @@ export default function Home() {
                   <label htmlFor="companion-count">Qui vient avec vous ?</label>
                   <p className="rsvp-hint">Famille, conjoint(e), enfants : vous êtes les bienvenus. Dites-nous simplement combien vous serez.</p>
                   <select id="companion-count" value={String(companions.length)} onChange={event => changeCompanionCount(Number(event.target.value))}>
-                    {Array.from({ length: (editMode ? maxCompanions : 9) + 1 }, (_, index) => index).map(count => (
+                    {Array.from({ length: (editMode ? Math.max(maxCompanions, companions.length) : MAX_COMPANIONS) + 1 }, (_, index) => index).map(count => (
                       <option key={count} value={count}>
                         {count === 0 ? 'Je viens seul(e)' : `${count} proche${count > 1 ? 's' : ''} avec moi`}
                       </option>
@@ -691,11 +726,23 @@ export default function Home() {
         >
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="rsvp-modal-title" aria-describedby="rsvp-modal-text" ref={modalRef}>
             <div className={`modal-icon ${rsvpReceipt.attending ? 'yes' : 'no'}`}>
-              {rsvpReceipt.attending ? <PartyPopper size={26} /> : <Heart size={26} />}
+              {rsvpReceipt.attending && rsvpReceipt.status !== 'waitlisted' ? <PartyPopper size={26} /> : <Heart size={26} />}
             </div>
-            <div className="eyebrow">{rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
+            <div className="eyebrow">{rsvpReceipt.status === 'review' ? 'Votre demande doit être vérifiée' : rsvpReceipt.status === 'waitlisted' ? 'Votre réponse a bien été reçue' : rsvpReceipt.updated ? 'Votre réponse a été modifiée' : rsvpReceipt.attending ? 'Votre présence est confirmée' : 'Votre réponse est enregistrée'}</div>
             <h3 id="rsvp-modal-title">Merci {rsvpReceipt.guestName} !</h3>
-            {rsvpReceipt.attending ? (
+            {rsvpReceipt.status === 'review' ? (
+              <>
+                <p id="rsvp-modal-text">Votre demande a bien été reçue, mais un nom très proche figure déjà dans la liste des invités. Les organisateurs vont vérifier qu’il ne s’agit pas d’un doublon et vous contacteront sur WhatsApp au numéro indiqué.</p>
+                <p className="modal-note">Votre invitation n’est pas encore confirmée. Aucune place n’est réservée tant que la vérification n’est pas terminée.</p>
+                <div className="modal-actions"><button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button></div>
+              </>
+            ) : rsvpReceipt.status === 'waitlisted' ? (
+              <>
+                <p id="rsvp-modal-text">Merci pour votre réponse. Les familles vous communiqueront les informations pratiques dès que possible.</p>
+                <p className="modal-note">Nous avons bien enregistré votre demande.</p>
+                <div className="modal-actions"><button type="button" className="button" ref={modalCloseRef} onClick={() => setRsvpReceipt(null)}>Fermer</button></div>
+              </>
+            ) : rsvpReceipt.attending ? (
               <>
                 <p id="rsvp-modal-text">
                   {rsvpReceipt.updated ? 'Nous avons bien enregistré vos modifications.' : 'Nous sommes heureux de vous compter parmi nous.'}{' '}
@@ -709,6 +756,29 @@ export default function Home() {
                 </div>
                 {rsvpReceipt.possibleDuplicate && (
                   <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>
+                )}
+                {content.pagne.enabled && content.pagne.contacts.length > 0 && (
+                  <section className="modal-pagne" aria-labelledby="modal-pagne-title">
+                    <div className="modal-pagne-heading"><ShoppingBag size={19} /><span id="modal-pagne-title">Pensez à votre uniforme</span></div>
+                    <p>Pour cette journée, les familles invitent tous les convives à porter le pagne officiel de la dot.</p>
+                    <strong className="modal-pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA <span>le morceau</span></strong>
+                    <div className="modal-pagne-contacts">
+                      {content.pagne.contacts.map((contact, index) => {
+                        const digits = contact.phone.replace(/\D/g, '');
+                        const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
+                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
+                        return digits.length >= 8 ? (
+                          <div className="modal-pagne-contact" key={contact.id}>
+                            <span>Contact : <strong>{sellerName}</strong></span>
+                            <div className="modal-pagne-actions">
+                              <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Commander sur WhatsApp</a>
+                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} /> Appeler</a>
+                            </div>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  </section>
                 )}
                 <p className="modal-note">Vous pourrez modifier votre réponse en renvoyant ce formulaire avec le même numéro.</p>
                 <div className="modal-actions">

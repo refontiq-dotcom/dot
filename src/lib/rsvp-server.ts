@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { normalizeNameKey } from '@/lib/rsvp';
+import { namesMayReferToSamePerson } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
@@ -68,36 +68,3 @@ export async function recordRateEvent(supabase: SupabaseClient, ipHash: string):
   if (error) console.error('Dot RSVP rate event insert failed:', error.message);
 }
 
-/**
- * Signale un nom déjà présent dans un autre groupe.
- * Simple avertissement : aucune fusion, aucun blocage. En cas d'erreur, on n'avertit pas.
- */
-export async function detectDuplicateNames(
-  supabase: SupabaseClient,
-  keys: string[],
-  excludePhone: string,
-): Promise<boolean> {
-  if (keys.length === 0) return false;
-  const targets = new Set(keys);
-
-  const [principals, companions] = await Promise.all([
-    supabase.from('rsvp_responses').select('guest_name, phone_normalized'),
-    supabase.from('rsvp_companions').select('name_normalized'),
-  ]);
-
-  if (principals.error || companions.error) {
-    console.error('Dot RSVP duplicate check failed:', principals.error?.message ?? companions.error?.message);
-    return false;
-  }
-
-  for (const row of (principals.data ?? []) as { guest_name: string; phone_normalized: string | null }[]) {
-    if (row.phone_normalized && row.phone_normalized === excludePhone) continue;
-    if (targets.has(normalizeNameKey(row.guest_name))) return true;
-  }
-
-  for (const row of (companions.data ?? []) as { name_normalized: string }[]) {
-    if (targets.has(row.name_normalized)) return true;
-  }
-
-  return false;
-}

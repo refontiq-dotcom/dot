@@ -11,7 +11,6 @@ import {
   NO_STORE,
   RATE_LIMITS,
   clientIp,
-  detectDuplicateNames,
   getAdminClient,
   hashIp,
   isRateLimited,
@@ -107,9 +106,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Même numéro = même inscription, mais on ne la modifie que sur demande explicite (mode « update »).
-  const nameKeys = [normalizeNameKey(guestName), ...companions.keys].filter(Boolean);
-  const possibleDuplicate = await detectDuplicateNames(supabase, nameKeys, phone.normalized);
+  // Le contrôle atomique des noms similaires est effectué dans save_rsvp.
 
   const { data, error } = await supabase.rpc('save_rsvp', {
     p_phone: phone.display,
@@ -123,6 +120,13 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     const message = error.message ?? '';
+    if (message.includes('possible_duplicate_name')) {
+      return jsonError(
+        'Une inscription avec un nom très proche existe déjà. Pour éviter un doublon, contactez les familles avant de réessayer.',
+        409,
+        'possible_duplicate_name',
+      );
+    }
     if (message.includes('already_registered')) {
       return jsonError('Vous êtes déjà sur la liste des invités. Pour changer votre réponse, touchez « Modifier ma réponse ».', 409, 'already_registered');
     }
@@ -147,6 +151,17 @@ export async function POST(request: NextRequest) {
   const saved = Array.isArray(data) ? data[0] : data;
   const companionCount = companions.names.length;
   const created = saved?.saved_created !== false;
+  const status = saved?.saved_status === 'review' ? 'review' : saved?.saved_status === 'waitlisted' ? 'waitlisted' : saved?.saved_status === 'declined' ? 'declined' : 'accepted';
+  let venueDetails: Record<string, unknown> | null = null;
+  if (status === 'accepted') {
+    const { data: details, error: detailsError } = await supabase
+      .from('private_event_details')
+      .select('venue, venue_detail, map_url, travel')
+      .eq('id', 'main')
+      .maybeSingle();
+    if (detailsError) console.error('Dot private venue read failed:', detailsError.message);
+    else if (details) venueDetails = details as Record<string, unknown>;
+  }
 
   return json(
     {
@@ -156,7 +171,9 @@ export async function POST(request: NextRequest) {
       attending,
       companionCount,
       personCount: groupSize(attending, companionCount),
-      possibleDuplicate,
+      possibleDuplicate: status === 'review',
+      status,
+      ...(venueDetails ? { venueDetails } : {}),
       updatedAt: saved?.saved_updated_at ?? new Date().toISOString(),
     },
     created ? 201 : 200,

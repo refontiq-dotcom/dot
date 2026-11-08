@@ -8,6 +8,8 @@ import {
   groupSize,
   normalizeIvorianPhone,
   normalizeNameKey,
+  namesMayReferToSamePerson,
+  normalizedNameTokens,
   removedCompanions,
   summarizeGuests,
   validateGuestName,
@@ -76,6 +78,27 @@ describe('Noms et doublons potentiels (scénarios B, H)', () => {
   it('ne produit pas de clé vide pour un nom uniquement composé de symboles', () => {
     expect(normalizeNameKey('---')).toBe('');
   });
+
+  it('refuse un numéro saisi à la place du nom', () => {
+    expect(validateGuestName('0710500584')).toBe('Le nom doit contenir au moins une lettre.');
+  });
+
+  it('repère un nom abrégé et un nom complet avec les mêmes mots distinctifs', () => {
+    expect(namesMayReferToSamePerson('AKA Richmond', "KABLAN N'GUETTIA RICHMOND AKA")).toBe(true);
+  });
+
+  it('repère une accompagnatrice malgré accents et variante Epse/Épée', () => {
+    expect(namesMayReferToSamePerson('Lega BÉATRICE Epse AKA', 'Lega BÉATRICE Épée AKA')).toBe(true);
+  });
+
+  it('ne confond pas deux personnes ayant seulement un mot en commun', () => {
+    expect(namesMayReferToSamePerson('Marie Kouassi', 'Marie Koffi')).toBe(false);
+    expect(namesMayReferToSamePerson('Richmond', "KABLAN N'GUETTIA RICHMOND AKA")).toBe(false);
+  });
+
+  it('ignore les particules de civilité et d’état civil', () => {
+    expect(normalizedNameTokens('Madame Lega Béatrice épouse AKA')).toEqual(['lega', 'beatrice', 'aka']);
+  });
 });
 
 describe('Accompagnateurs (scénarios D, E, F, G)', () => {
@@ -93,10 +116,9 @@ describe('Accompagnateurs (scénarios D, E, F, G)', () => {
     }
   });
 
-  it('accepte l’ajout d’un troisième accompagnateur', () => {
+  it('refuse un troisième accompagnateur au-delà de la limite de deux', () => {
     const result = cleanCompanionNames(['Awa Traoré', 'Yao Koffi', 'Koffi N’Guessan'], true);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(groupSize(true, result.names.length)).toBe(4);
+    expect(result.ok).toBe(false);
   });
 
   it('refuse deux fois la même personne, même écrite différemment', () => {
@@ -104,8 +126,9 @@ describe('Accompagnateurs (scénarios D, E, F, G)', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('refuse un nom vide, trop long ou une liste trop grande', () => {
+  it('refuse un nom vide, numérique, trop long ou une liste trop grande', () => {
     expect(cleanCompanionNames([''], true).ok).toBe(false);
+    expect(cleanCompanionNames(['0710500584'], true).ok).toBe(false);
     expect(cleanCompanionNames(['A'.repeat(121)], true).ok).toBe(false);
     expect(cleanCompanionNames(Array.from({ length: MAX_COMPANIONS + 1 }, (_, i) => `Invité ${i}`), true).ok).toBe(false);
   });
