@@ -6,6 +6,7 @@ import { namesMayReferToSamePerson } from '@/lib/rsvp';
 
 export const RATE_LIMITS = {
   savePerHourPerIp: 30,
+  lookupPerHourPerIp: 10,
 } as const;
 
 export const NO_STORE = { 'Cache-Control': 'no-store' };
