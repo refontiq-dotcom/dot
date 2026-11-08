@@ -68,36 +68,3 @@ export async function recordRateEvent(supabase: SupabaseClient, ipHash: string):
   if (error) console.error('Dot RSVP rate event insert failed:', error.message);
 }
 
-/**
- * Détecte un nom déjà présent dans un autre groupe, y compris les noms abrégés,
- * les accents et les variantes courantes. Les compagnons du dossier en cours
- * de modification sont exclus. La base applique la même règle en dernier recours.
- */
-export async function detectDuplicateNames(
-  supabase: SupabaseClient,
-  names: string[],
-  excludePhone: string,
-): Promise<boolean> {
-  if (names.length === 0) return false;
-
-  const [principals, companions] = await Promise.all([
-    supabase.from('rsvp_responses').select('id, guest_name, phone_normalized'),
-    supabase.from('rsvp_companions').select('rsvp_id, full_name'),
-  ]);
-
-  if (principals.error || companions.error) {
-    console.error('Dot RSVP duplicate check failed:', principals.error?.message ?? companions.error?.message);
-    return false;
-  }
-
-  const principalRows = (principals.data ?? []) as { id: string; guest_name: string; phone_normalized: string | null }[];
-  const excludedIds = new Set(principalRows.filter(row => row.phone_normalized === excludePhone).map(row => row.id));
-  const existingNames = [
-    ...principalRows.filter(row => !excludedIds.has(row.id)).map(row => row.guest_name),
-    ...((companions.data ?? []) as { rsvp_id: string; full_name: string }[])
-      .filter(row => !excludedIds.has(row.rsvp_id))
-      .map(row => row.full_name),
-  ];
-
-  return names.some(incoming => existingNames.some(existing => namesMayReferToSamePerson(incoming, existing)));
-}
