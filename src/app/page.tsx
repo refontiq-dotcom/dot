@@ -40,14 +40,14 @@ function Calendar() {
   return <CalendarDays size={19} />;
 }
 
-function pagneWhatsAppUrl(phone: string, guestName: string, personCount: number, sellerName: string, price: number) {
-  const digits = phone.replace(/\\D/g, '');
+function pagneWhatsAppUrl(phone: string, guestName: string, personCount: number, sellerName: string, price: number, eventCouple: string) {
+  const digits = phone.replace(/\D/g, '');
   const whatsappDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
   const groupLabel = personCount > 1 ? `${personCount} personnes` : '1 personne';
   const message = [
     `Bonjour ${sellerName},`,
     '',
-    `Je suis ${guestName}. J'ai confirmé ma présence à la dot d'Anougbre Frédéric et Dukoua You Vanessa.`,
+    `Je suis ${guestName}. J'ai confirmé ma présence à la dot de ${eventCouple}.`,
     `Nous serons ${groupLabel}.`,
     '',
     `Je souhaite commander le pagne officiel de la dot, au prix de ${price.toLocaleString('fr-FR')} FCFA le morceau.`,
@@ -758,15 +758,15 @@ export default function Home() {
                     <strong className="modal-pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA <span>le morceau</span></strong>
                     <div className="modal-pagne-contacts">
                       {content.pagne.contacts.map((contact, index) => {
-                        const digits = contact.phone.replace(/\\D/g, '');
+                        const digits = contact.phone.replace(/\D/g, '');
                         const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
-                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0));
+                        const whatsappUrl = pagneWhatsAppUrl(contact.phone, rsvpReceipt.guestName, rsvpReceipt.personCount, sellerName, Number(content.pagne.price || 0), `${content.groomName} et ${content.brideName}`);
                         return digits.length >= 8 ? (
                           <div className="modal-pagne-contact" key={contact.id}>
                             <span>Contact : <strong>{sellerName}</strong></span>
                             <div className="modal-pagne-actions">
                               <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Commander sur WhatsApp</a>
-                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\\d]/g, '')}`}><Phone size={16} /> Appeler</a>
+                              <a className="button secondary" href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}><Phone size={16} /> Appeler</a>
                             </div>
                           </div>
                         ) : null;
