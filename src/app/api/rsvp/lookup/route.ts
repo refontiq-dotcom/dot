@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   return json({
     ok: true,
     guestName: row.guest_name,
-    attending: row.confirmed === true,
+    attending: row.attendance_status ? row.attendance_status !== 'declined' : row.confirmed === true,
     companions: (companionRows ?? []).map(c => String(c.full_name)),
     maxCompanions: Number(row.max_companions ?? 0),
     status: row.attendance_status ?? (row.confirmed ? 'accepted' : 'declined'),
