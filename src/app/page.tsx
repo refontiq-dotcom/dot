@@ -5,7 +5,6 @@ import {
   CalendarDays,
   MapPin,
   Megaphone,
-  Clock3,
   Heart,
   PartyPopper,
   House,
@@ -544,7 +543,7 @@ export default function Home() {
                 </div>
               )}
             </section>
-            <form className={'rsvp-form' + (editMode ? ' is-edit-modal' : '')} onSubmit={submitRsvp} data-reveal={!editMode} role={editMode ? 'dialog' : undefined} aria-modal={editMode ? true : undefined} aria-label={editMode ? 'Modifier ma présence' : undefined}>
+            <form className={'rsvp-form' + (editMode ? ' is-edit-modal' : '')} onSubmit={submitRsvp} data-reveal={editMode ? undefined : true} role={editMode ? 'dialog' : undefined} aria-modal={editMode ? true : undefined} aria-label={editMode ? 'Modifier ma présence' : undefined}>
               {editMode && (
                 <div className="rsvp-edit-banner" role="status">
                   <b>Vous modifiez votre réponse</b>
@@ -693,11 +692,19 @@ export default function Home() {
 
   useEffect(() => {
     if (!editMode) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('guest-name')?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') cancelEdit();
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
   }, [editMode]);
 
       {rsvpReceipt && (
