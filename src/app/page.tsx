@@ -512,7 +512,7 @@ export default function Home() {
         )}
 
         <section className="section" id="programme">
-          <div className="shell location">
+          <div className="shell">
             <div data-reveal>
               <div className="eyebrow">Le déroulement</div>
               <h2>Programme de la journée</h2>
