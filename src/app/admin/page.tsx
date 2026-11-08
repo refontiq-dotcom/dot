@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
   const [filter,setFilter]=useState<GuestFilter>('all');
   const [uploadingPagne,setUploadingPagne]=useState(false);
+  const [deletingGuestId,setDeletingGuestId]=useState<string|null>(null);
 
   const checkSession=useCallback(async()=>{
     try { const {data}=await getSupabase().auth.getSession(); const email=data.session?.user.email?.toLowerCase();
@@ -73,6 +74,22 @@ export default function AdminPage() {
     }catch(e){setNotice(e instanceof Error?e.message:'Impossible de traiter cette demande.');}
   }
   function field<K extends keyof Content>(key:K,value:Content[K]){setContent(v=>({...v,[key]:value}));}
+  async function deleteGuest(id:string,name:string){
+    if(!window.confirm(`Confirmer la suppression de l’inscription de « ${name} » ? Cette action est définitive.`))return;
+    setDeletingGuestId(id);setNotice('');
+    try{
+      const {data}=await getSupabase().auth.getSession();
+      const token=data.session?.access_token;
+      if(!token)throw new Error('Votre session organisateur a expiré. Reconnectez-vous.');
+      const response=await fetch('/api/admin/rsvp-delete',{method:'DELETE',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({id})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Impossible de supprimer cette inscription.');
+      await refresh();
+      setNotice(`L’inscription de « ${name} » a été supprimée.`);
+    }catch(e){setNotice(e instanceof Error?e.message:'Impossible de supprimer cette inscription.');}
+    finally{setDeletingGuestId(null);}
+  }
+
   function setTravel(patch:Partial<Content['travel']>){setContent(v=>({...v,travel:{...v.travel,...patch}}));}
   function editBusLine(i:number,patch:Partial<Content['travel']['busLines'][number]>){setContent(v=>({...v,travel:{...v.travel,busLines:v.travel.busLines.map((l,n)=>n===i?{...l,...patch}:l)}}));}
   function addBusLine(){setContent(v=>({...v,travel:{...v.travel,busLines:[...v.travel.busLines,{id:crypto.randomUUID(),number:'',from:'',to:''}]}}));}
@@ -282,6 +299,7 @@ export default function AdminPage() {
             {digits&&<div className="admin-guest-actions"><a className="admin-chip" href={`tel:+${digits}`}><Phone size={16}/> Appeler</a><a className="admin-chip" href={g.status==='review'||g.duplicates.length>0? `https://wa.me/${digits}?text=${encodeURIComponent(`Bonjour ${g.name}, nous vous contactons au sujet de la cérémonie de la Dot d’Anougbre Brou Frédéric et de Dukoua You Vanessa, prévue le 12 décembre 2026. Votre demande de présence a bien été reçue. Toutefois, votre nom semble déjà figurer dans notre liste d’invités. Afin de vérifier qu’il ne s’agit pas d’un doublon, pouvez-vous nous confirmer qu’il s’agit bien de votre première inscription ? Merci, les familles.`) }` : `https://wa.me/${digits}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/> {g.status==='review'||g.duplicates.length>0?'Contacter sur WhatsApp':'WhatsApp'}</a></div>}
             {g.status==='review'&&<div className="admin-guest-actions"><button className="button small" onClick={()=>void resolveReview(g.id,'accepted')}>Confirmer l’invitation</button><button className="button secondary small" onClick={()=>void resolveReview(g.id,'declined')}>Refuser après vérification</button></div>}
             {g.duplicates.length>0&&<p className="admin-warn"><AlertTriangle size={15}/> À vérifier : le nom « {g.duplicates[0]} » apparaît aussi dans une autre réponse. C’est peut-être la même personne.</p>}
+            {g.duplicates.length>0&&<div className="admin-guest-actions"><button className="button secondary small" onClick={()=>void deleteGuest(g.id,g.name)} disabled={deletingGuestId!==null}><Trash2 size={15}/>{deletingGuestId===g.id?'Suppression…':'Supprimer cette inscription'}</button></div>}
             <p className="admin-guest-date">Répondu le {new Date(g.createdAt).toLocaleDateString('fr-FR')}{g.updatedAt&&g.updatedAt!==g.createdAt&&` · modifié le ${new Date(g.updatedAt).toLocaleDateString('fr-FR')}`}</p>
           </li>;})}
           {!shown.length&&<li className="admin-empty">{loading?'Chargement…':groups.length===0?'Aucune réponse pour le moment.':'Aucun résultat. Essayez un autre nom ou choisissez « Tous ».'}</li>}
