@@ -7,7 +7,7 @@
  *    et jamais lorsqu'il est demandé depuis l'espace organisateurs.
  * Pour forcer une mise à jour du cache chez tous les invités, changer VERSION.
  */
-const VERSION = 'dot-v1';
+const VERSION = 'dot-v2';
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const DATA = `${VERSION}-data`;
