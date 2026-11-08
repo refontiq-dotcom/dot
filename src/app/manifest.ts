@@ -16,9 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#0b2f73',
     categories: ['lifestyle'],
     icons: [
-      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: '/couple-frederic-vanessa.jpg', sizes: '1000x1000', type: 'image/jpeg', purpose: 'any' },
     ],
     shortcuts: [
       { name: 'Programme de la journée', short_name: 'Programme', url: '/#programme', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
