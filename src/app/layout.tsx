@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import PwaRegister from '@/components/PwaRegister';
+import OfflineStatus from '@/components/OfflineStatus';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fr">
       <body>
+        <OfflineStatus />
         {children}
         <PwaRegister />
       </body>

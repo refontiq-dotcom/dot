@@ -442,3 +442,19 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 .install-dialog .install-help{margin-top:15px}
 .install-dialog .install-help ol{padding-left:22px;display:grid;gap:9px;color:var(--ink);font-size:14px}
 .install-dialog .install-help .button{width:100%;margin-top:14px}
+
+/* Notifications Web Push */
+.push-optin{display:grid;gap:12px;padding:15px;margin:16px 0;border:1px solid #d5e2ec;border-radius:14px;background:#f4f8fb;color:var(--deep)}
+.push-optin>div{display:flex;align-items:flex-start;gap:10px}
+.push-optin>div>svg,.push-optin-success>svg{flex-shrink:0;margin-top:2px}
+.push-optin strong{display:block;font-size:14px}
+.push-optin p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.push-optin .button{justify-self:start}
+.push-optin-message{font-size:13px!important;margin:0!important}
+.push-optin-success{display:flex;align-items:flex-start;gap:10px;background:#edf7f1;border-color:#c6e5d1;color:#205b38;font-size:14px}
+
+
+/* État réseau : bandeau visible uniquement hors connexion */
+.offline-status{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:10px;padding:11px max(16px,calc((100% - 1100px)/2));background:#fff4dc;border-bottom:1px solid #efdcae;color:#684c18;font-size:13px;line-height:1.45}
+.offline-status svg{flex-shrink:0}
+.offline-status strong{font-weight:800}

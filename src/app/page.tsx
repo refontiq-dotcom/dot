@@ -23,10 +23,12 @@ import { initialContent, loadContent, type Content } from '@/lib/content';
 import TravelGuide from '@/components/TravelGuide';
 import ProgramTimeline from '@/components/ProgramTimeline';
 import InstallApp from '@/components/InstallApp';
+import PushNotifications from '@/components/PushNotifications';
 import { MAX_COMPANIONS, cleanPersonName, normalizeIvorianPhone, normalizeNameKey, removedCompanions } from '@/lib/rsvp';
 
 type RsvpReceipt = {
   guestName: string;
+  phoneNormalized: string;
   attending: boolean;
   companionCount: number;
   personCount: number;
@@ -391,6 +393,7 @@ export default function Home() {
         }));
       }
       setRsvpReceipt({
+        phoneNormalized: parsed.normalized,
         guestName: typeof result.guestName === 'string' ? result.guestName : cleanPersonName(guestName),
         attending: typeof result.attending === 'boolean' ? result.attending : attendingYes,
         companionCount: typeof result.companionCount === 'number' ? result.companionCount : 0,
@@ -670,6 +673,7 @@ export default function Home() {
                       </div>
                       <p>{lookupResult.status === 'accepted' ? 'Votre groupe compte ' + lookupResult.personCount + ' personne' + (lookupResult.personCount > 1 ? 's' : '') + '.' : lookupResult.status === 'waitlisted' ? 'Votre demande est enregistrée. Les familles vous informeront si une place se libère.' : lookupResult.status === 'review' ? 'Votre demande doit encore être vérifiée par les familles.' : 'Votre absence a bien été enregistrée.'}</p>
                       {lookupResult.attending && lookupResult.companions.length > 0 && <p className="rsvp-lookup-names"><strong>Personnes déclarées :</strong> {lookupResult.guestName}, {lookupResult.companions.join(', ')}</p>}
+                      {lookupResult.status === 'accepted' && <PushNotifications guestName={lookupResult.guestName} phone={lookupResult.phoneNormalized} />}
                       {lookupResult.status === 'accepted' && lookupResult.venueDetails && (
                         <div className="rsvp-private-details">
                           <div className="eyebrow">Informations réservées aux invités confirmés</div>
@@ -787,6 +791,7 @@ export default function Home() {
                   <CalendarCheck size={18} />
                   <span>{formattedEventDate} · {formattedEventTime}<br />{content.venue}, {content.venueDetail}</span>
                 </div>
+                <PushNotifications guestName={rsvpReceipt.guestName} phone={rsvpReceipt.phoneNormalized} />
                 {rsvpReceipt.possibleDuplicate && (
                   <p className="modal-note"><Info size={16} /> Un nom identique figure déjà dans la liste. Les organisateurs vérifieront qu’il ne s’agit pas d’un doublon.</p>
                 )}
