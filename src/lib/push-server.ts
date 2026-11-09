@@ -118,6 +118,8 @@ export async function sendWebPush(
 ): Promise<number> {
   if (!isAllowedPushEndpoint(subscription.endpoint)) throw new Error('Unsupported push service endpoint');
   const body = encryptPushPayload(subscription, message);
+  const requestBody = new ArrayBuffer(body.byteLength);
+  new Uint8Array(requestBody).set(body);
   const response = await fetch(subscription.endpoint, {
     method: 'POST',
     headers: {
@@ -127,7 +129,7 @@ export async function sendWebPush(
       TTL: String(60 * 60 * 24),
       Urgency: 'normal',
     },
-    body,
+    body: requestBody,
     cache: 'no-store',
     redirect: 'error',
   });
