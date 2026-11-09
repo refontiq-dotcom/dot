@@ -24,6 +24,20 @@ export async function organizerPushClient(request: NextRequest): Promise<Supabas
   return getAdminClient();
 }
 
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' && (
+      host === 'fcm.googleapis.com' ||
+      host === 'updates.push.services.mozilla.com' ||
+      host === 'push.services.mozilla.com' ||
+      host === 'web.push.apple.com' ||
+      host.endsWith('.notify.windows.com')
+    );
+  } catch { return false; }
+}
+
 export function pushConfigured(): boolean {
   return Boolean(process.env.WEB_PUSH_PUBLIC_KEY && process.env.WEB_PUSH_PRIVATE_KEY);
 }
@@ -102,6 +116,7 @@ export async function sendWebPush(
   subscription: { endpoint: string; p256dh: string; auth: string },
   message: string,
 ): Promise<number> {
+  if (!isAllowedPushEndpoint(subscription.endpoint)) throw new Error('Unsupported push service endpoint');
   const body = encryptPushPayload(subscription, message);
   const response = await fetch(subscription.endpoint, {
     method: 'POST',
@@ -109,12 +124,12 @@ export async function sendWebPush(
       Authorization: vapidAuthorization(subscription.endpoint),
       'Content-Type': 'application/octet-stream',
       'Content-Encoding': 'aes128gcm',
-      'Content-Length': String(body.length),
       TTL: String(60 * 60 * 24),
       Urgency: 'normal',
     },
     body,
     cache: 'no-store',
+    redirect: 'error',
   });
   return response.status;
 }
