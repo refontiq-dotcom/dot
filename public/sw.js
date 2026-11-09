@@ -7,11 +7,11 @@
  *    et jamais lorsqu'il est demandé depuis l'espace organisateurs.
  * Pour forcer une mise à jour du cache chez tous les invités, changer VERSION.
  */
-const VERSION = 'dot-v3';
+const VERSION = 'dot-v4';
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
 const DATA = `${VERSION}-data`;
-const PRECACHE = ['/', '/manifest.webmanifest', '/couple-frederic-vanessa.jpg'];
+const PRECACHE = ['/', '/offline.html', '/manifest.webmanifest', '/couple-frederic-vanessa.jpg', '/icons/icon-192.png', '/icons/icon-512.png'];
 const PUBLIC_DATA = /\/rest\/v1\/(site_content|program_items|faq_items)(\?|$)/;
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -46,8 +46,11 @@ async function networkFirst(request, cacheName, fallbackKey) {
   } catch (error) {
     const cached = await cache.match(fallbackKey || request, { ignoreSearch: false });
     if (cached) return cached;
-    // Dernier recours : laisser la requête aller au bout du réseau (sans limite de temps).
-    try { return await fetch(request); } catch (finalError) { return Response.error(); }
+    if (request.mode === 'navigate') {
+      const offlinePage = await caches.match('/offline.html');
+      if (offlinePage) return offlinePage;
+    }
+    return Response.error();
   }
 }
 
