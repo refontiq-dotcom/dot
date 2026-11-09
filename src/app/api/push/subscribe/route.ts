@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/rsvp-server';
 import { cleanPersonName, normalizeIvorianPhone, normalizeNameKey } from '@/lib/rsvp';
-import { pushOriginAllowed, PUSH_NO_STORE } from '@/lib/push-server';
+import { isAllowedPushEndpoint, pushOriginAllowed, PUSH_NO_STORE } from '@/lib/push-server';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   const endpoint = typeof subscription?.endpoint === 'string' ? subscription.endpoint : '';
   const p256dh = typeof keys?.p256dh === 'string' ? keys.p256dh : '';
   const auth = typeof keys?.auth === 'string' ? keys.auth : '';
-  if (guestName.length < 2 || guestName.length > 120 || !phone.ok || !endpoint.startsWith('https://') || !p256dh || !auth) {
+  if (guestName.length < 2 || guestName.length > 120 || !phone.ok || !isAllowedPushEndpoint(endpoint) || !p256dh || !auth) {
     return reply({ error: 'Informations de notification invalides.' }, 400);
   }
 
