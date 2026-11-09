@@ -51,8 +51,8 @@ function hmac(key: Buffer, value: Buffer): Buffer {
 }
 
 function hkdfExpand(prk: Buffer, info: Buffer, length: number): Buffer {
-  let output = Buffer.alloc(0);
-  let previous = Buffer.alloc(0);
+  let output: Buffer = Buffer.alloc(0);
+  let previous: Buffer = Buffer.alloc(0);
   let counter = 1;
   while (output.length < length) {
     previous = hmac(prk, Buffer.concat([previous, info, Buffer.from([counter])]));
