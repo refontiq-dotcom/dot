@@ -544,8 +544,8 @@ export default function Home() {
                   <div className="eyebrow">Disponible à la commande</div>
                   <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA <span style={{ fontSize: 15, fontWeight: 500 }}>le morceau</span></div>
                   <p>Pour commander, contactez directement l’un des vendeurs ci-dessous.</p>
-                  {content.pagne.contacts.filter(contact => contact.phone.replace(/\\D/g, '').length >= 8).map((contact, index) => {
-                    const digits = contact.phone.replace(/\\D/g, '');
+                  {content.pagne.contacts.filter(contact => contact.phone.replace(/\D/g, '').length >= 8).map((contact, index) => {
+                    const digits = contact.phone.replace(/\D/g, '');
                     const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
                     const phoneDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
                     const whatsappUrl = pagneWhatsAppUrl(contact.phone, 'Invité(e)', 1, sellerName, Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName);
@@ -560,7 +560,7 @@ export default function Home() {
                       </div>
                     );
                   })}
-                  {content.pagne.contacts.every(contact => contact.phone.replace(/\\D/g, '').length < 8) && (
+                  {content.pagne.contacts.every(contact => contact.phone.replace(/\D/g, '').length < 8) && (
                     <p>Les coordonnées des vendeurs seront communiquées prochainement.</p>
                   )}
                 </div>
