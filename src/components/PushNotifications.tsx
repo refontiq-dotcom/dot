@@ -5,10 +5,11 @@ import { Bell, BellRing } from 'lucide-react';
 
 type Props = { guestName: string; phone: string };
 
-function decodeKey(value: string): Uint8Array {
+function decodeKey(value: string): ArrayBuffer {
   const padding = '='.repeat((4 - value.length % 4) % 4);
   const raw = atob(value.replace(/-/g, '+').replace(/_/g, '/') + padding);
-  return Uint8Array.from(raw, character => character.charCodeAt(0));
+  const bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 export default function PushNotifications({ guestName, phone }: Props) {
