@@ -1,11 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Bus, Home, LogOut, MessageCircle, Phone, LockKeyhole, Users, UserCheck, UserX, MapPin, ListChecks, Megaphone, CircleHelp, Save, Plus, Trash2, Download, RefreshCw, Search, ShieldCheck, ShoppingBag, ImagePlus, Bell } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { initialContent, loadContent, saveContent, type Content, type Item } from '@/lib/content';
 import { declaredGroupSize, namesMayReferToSamePerson, summarizeGuests } from '@/lib/rsvp';
 import { formatRange, sortByTime } from '@/lib/program';
+import PushNotificationsPanel from '@/components/PushNotificationsPanel';
 
 const ADMIN_EMAIL = 'refontiq@gmail.com';
 const plain = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -14,7 +15,7 @@ type Companion = { id: string; full_name: string; position: number };
 type RSVP = { id: string; guest_name: string; phone: string | null; person_count: number; confirmed: boolean; attendance_status?: 'accepted' | 'waitlisted' | 'declined' | 'review'; created_at: string; updated_at: string | null; rsvp_companions: Companion[] | null };
 type GuestFilter = 'all' | 'yes' | 'no' | 'waitlisted' | 'check';
 type GuestGroup = { id: string; name: string; phone: string | null; confirmed: boolean; status: 'accepted' | 'waitlisted' | 'declined' | 'review'; size: number; companions: string[]; unnamed: number; createdAt: string; updatedAt: string | null; duplicates: string[] };
-type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne';
+type Tab = 'overview' | 'travel' | 'event' | 'program' | 'announcement' | 'faq' | 'guests' | 'pagne' | 'notifications';
 
 export default function AdminPage() {
   const [password,setPassword]=useState(''),[ready,setReady]=useState(false),[logged,setLogged]=useState(false);
@@ -188,6 +189,7 @@ export default function AdminPage() {
     {id:'announcement',label:'Message aux invités',help:'Un message mis en avant en haut du site.',icon:<Megaphone/>},
     {id:'faq',label:'Questions des invités',help:'Les réponses aux questions que se posent vos invités.',icon:<CircleHelp/>},
     {id:'pagne',label:'Pagne de la dot',help:'La photo, le prix et les vendeurs du pagne.',icon:<ShoppingBag/>},
+    {id:'notifications',label:'Notifications',help:'Envoyez un rappel directement sur le téléphone des invités abonnés.',icon:<Bell/>},
   ];
   const plural=(n:number,one:string,many:string)=>`${n} ${n>1?many:one}`;
   const pendingProgram=content.items.filter(i=>!i.confirmed).length,pendingFaq=content.faq.filter(i=>!i.confirmed).length;
@@ -262,6 +264,8 @@ export default function AdminPage() {
         {content.faq.map((item,i)=><div className="admin-edit-card" key={item.id}><div className="admin-edit-card-head"><b>Question {i+1}</b><button className="admin-icon-button danger" onClick={()=>removeItem('faq',i)} aria-label="Supprimer"><Trash2/></button></div>
           <label>Question</label><input value={item.title} onChange={e=>editItem('faq',i,{title:e.target.value})}/><label>Réponse</label><textarea value={item.detail} onChange={e=>editItem('faq',i,{detail:e.target.value})}/><label className="admin-checkbox"><input type="checkbox" checked={item.confirmed} onChange={e=>editItem('faq',i,{confirmed:e.target.checked})}/> Réponse confirmée</label></div>)}
         <button className="button" onClick={()=>void save()} disabled={saving}><Save size={16}/>{saving?'Enregistrement…':'Enregistrer la FAQ'}</button></div>}
+
+      {tab==='notifications'&&<PushNotificationsPanel/>}
 
       {tab==='pagne'&&<div className="admin-panel"><h3>Le pagne de la dot</h3>
         <p className="admin-muted">Une présentation simple : photo, prix et contacts directs des vendeurs.</p>
