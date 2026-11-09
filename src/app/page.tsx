@@ -137,7 +137,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    const sections = ['accueil', 'annonces', 'programme', 'rsvp', 'faq']
+    const sections = ['accueil', 'pagne', 'annonces', 'programme', 'rsvp', 'faq']
       .map(id => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) return;
@@ -473,6 +473,7 @@ export default function Home() {
           <a href="#accueil" className="brand">F <span style={{ color: 'var(--accent)' }}>×</span> V</a>
           <nav className="navlinks" aria-label="Navigation principale">
             <a href="#programme">Programme</a>
+            {content.pagne.enabled && <a href="#pagne">Acheter le pagne</a>}
             <a href="#rsvp">Présence</a>
             <a href="#faq">Questions</a>
           </nav>
@@ -518,6 +519,55 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {content.pagne.enabled && (
+          <section className="section" id="pagne">
+            <div className="shell pagne-section">
+              <div className="section-head" data-reveal>
+                <div className="eyebrow">Tenue de la célébration</div>
+                <h2>Le pagne officiel de la dot</h2>
+                <p>{content.pagne.description || 'Retrouvez ici les informations pour commander le pagne officiel de la dot.'}</p>
+              </div>
+              <div className="pagne-card" data-reveal>
+                <div className="pagne-visual">
+                  {content.pagne.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={content.pagne.imageUrl} alt="Pagne officiel de la dot" loading="lazy" />
+                  ) : (
+                    <div className="pagne-placeholder">
+                      <ShoppingBag size={54} />
+                      <span>Pagne officiel de la dot</span>
+                    </div>
+                  )}
+                </div>
+                <div className="pagne-details">
+                  <div className="eyebrow">Disponible à la commande</div>
+                  <div className="pagne-price">{Number(content.pagne.price || 0).toLocaleString('fr-FR')} FCFA <span style={{ fontSize: 15, fontWeight: 500 }}>le morceau</span></div>
+                  <p>Pour commander, contactez directement l’un des vendeurs ci-dessous.</p>
+                  {content.pagne.contacts.filter(contact => contact.phone.replace(/\\D/g, '').length >= 8).map((contact, index) => {
+                    const digits = contact.phone.replace(/\\D/g, '');
+                    const sellerName = contact.label.trim() || `Vendeur ${index + 1}`;
+                    const phoneDigits = digits.startsWith('0') ? `225${digits.slice(1)}` : digits;
+                    const whatsappUrl = pagneWhatsAppUrl(contact.phone, 'Invité(e)', 1, sellerName, Number(content.pagne.price || 0), content.groomName + ' et ' + content.brideName);
+                    return (
+                      <div className="pagne-seller" key={contact.id}>
+                        <strong>{sellerName}</strong>
+                        <span>{contact.phone}</span>
+                        <div className="pagne-actions">
+                          <a className="button" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Commander sur WhatsApp</a>
+                          <a className="button secondary" href={`tel:+${phoneDigits}`}><Phone size={17} /> Appeler</a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {content.pagne.contacts.every(contact => contact.phone.replace(/\\D/g, '').length < 8) && (
+                    <p>Les coordonnées des vendeurs seront communiquées prochainement.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {content.announcement.trim() && !content.announcement.trim().toLowerCase().startsWith('bienvenue sur votre espace famille') && (
           <section className="section soft" id="annonces">
@@ -752,6 +802,7 @@ export default function Home() {
       <nav className="mobile-nav" aria-label="Navigation rapide">
         <a href="#accueil" aria-current={activeSection === 'accueil' ? 'location' : undefined}><House /><span>Accueil</span></a>
         <a href="#programme" aria-current={activeSection === 'programme' ? 'location' : undefined}><ListChecks /><span>Programme</span></a>
+        {content.pagne.enabled && <a href="#pagne" aria-current={activeSection === 'pagne' ? 'location' : undefined}><ShoppingBag /><span>Pagne</span></a>}
         <a href="#rsvp" aria-current={activeSection === 'rsvp' ? 'location' : undefined}><CalendarCheck /><span>Présence</span></a>
         <a href="#faq" aria-current={activeSection === 'faq' ? 'location' : undefined}><CircleHelp /><span>FAQ</span></a>
       </nav>
