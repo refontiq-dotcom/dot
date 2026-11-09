@@ -110,8 +110,8 @@ self.addEventListener('push', event => {
   const title = typeof payload.title === 'string' ? payload.title : 'Dot de Frédéric & Vanessa';
   const options = {
     body: typeof payload.body === 'string' ? payload.body : 'Une nouvelle information concernant la cérémonie est disponible.',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: '/couple-frederic-vanessa.jpg',
+    badge: '/couple-frederic-vanessa.jpg',
     tag: 'dot-event-update',
     renotify: false,
     data: { url: typeof payload.url === 'string' ? payload.url : '/' },
