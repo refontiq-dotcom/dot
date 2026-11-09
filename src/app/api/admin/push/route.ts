@@ -1,19 +1,10 @@
-import webpush from 'web-push';
 import { NextRequest, NextResponse } from 'next/server';
-import { organizerPushClient, PUSH_NO_STORE, pushConfigured } from '@/lib/push-server';
+import { organizerPushClient, PUSH_NO_STORE, pushConfigured, sendWebPush } from '@/lib/push-server';
 
 export const runtime = 'nodejs';
 
 function reply(payload: Record<string, unknown>, status = 200) {
   return NextResponse.json(payload, { status, headers: PUSH_NO_STORE });
-}
-
-function configurePush() {
-  const publicKey = process.env.WEB_PUSH_PUBLIC_KEY;
-  const privateKey = process.env.WEB_PUSH_PRIVATE_KEY;
-  if (!publicKey || !privateKey) return false;
-  webpush.setVapidDetails('mailto:refontiq@gmail.com', publicKey, privateKey);
-  return true;
 }
 
 export async function GET(request: NextRequest) {
@@ -32,7 +23,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = await organizerPushClient(request);
   if (!supabase) return reply({ error: 'Accès réservé aux organisateurs.' }, 403);
-  if (!configurePush()) return reply({ error: 'Les clés de notification ne sont pas configurées sur le serveur.' }, 503);
+  if (!pushConfigured()) return reply({ error: 'Les clés de notification ne sont pas configurées sur le serveur.' }, 503);
 
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; }
@@ -58,11 +49,19 @@ export async function POST(request: NextRequest) {
 
   for (const row of subscriptions) {
     try {
-      await webpush.sendNotification({
+      const statusCode = await sendWebPush({
         endpoint: row.endpoint,
-        keys: { p256dh: row.p256dh, auth: row.auth },
-      }, payload, { TTL: 60 * 60 * 24 });
-      sent += 1;
+        p256dh: row.p256dh,
+        auth: row.auth,
+      }, payload);
+      if (statusCode === 404 || statusCode === 410) {
+        await supabase.from('push_subscriptions').delete().eq('id', row.id);
+        removed += 1;
+      } else if (statusCode < 200 || statusCode >= 300) {
+        failed += 1;
+      } else {
+        sent += 1;
+      }
     } catch (error) {
       const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error
         ? Number((error as { statusCode?: unknown }).statusCode) : 0;
