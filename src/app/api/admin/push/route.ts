@@ -10,7 +10,12 @@ function reply(payload: Record<string, unknown>, status = 200) {
 export async function GET(request: NextRequest) {
   const supabase = await organizerPushClient(request);
   if (!supabase) return reply({ error: 'Accès réservé aux organisateurs.' }, 403);
-  const { data, error } = await supabase.from('push_subscriptions').select('id,rsvp_id,created_at');
+  const { data: accepted, error: guestsError } = await supabase
+    .from('rsvp_responses').select('id').eq('attendance_status', 'accepted');
+  if (guestsError) return reply({ error: 'Impossible de vérifier les invitations confirmées.' }, 500);
+  const acceptedIds = (accepted ?? []).map(item => item.id);
+  if (acceptedIds.length === 0) return reply({ configured: pushConfigured(), devices: 0, guests: 0 });
+  const { data, error } = await supabase.from('push_subscriptions').select('id,rsvp_id').in('rsvp_id', acceptedIds);
   if (error) return reply({ error: 'Impossible de charger les abonnements.' }, 500);
   const subscriptions = data ?? [];
   return reply({
