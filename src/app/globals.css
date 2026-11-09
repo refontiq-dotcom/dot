@@ -452,3 +452,9 @@ h1.serif{text-wrap:balance;overflow-wrap:anywhere}
 .push-optin .button{justify-self:start}
 .push-optin-message{font-size:13px!important;margin:0!important}
 .push-optin-success{display:flex;align-items:flex-start;gap:10px;background:#edf7f1;border-color:#c6e5d1;color:#205b38;font-size:14px}
+
+
+/* État réseau : bandeau visible uniquement hors connexion */
+.offline-status{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:10px;padding:11px max(16px,calc((100% - 1100px)/2));background:#fff4dc;border-bottom:1px solid #efdcae;color:#684c18;font-size:13px;line-height:1.45}
+.offline-status svg{flex-shrink:0}
+.offline-status strong{font-weight:800}
